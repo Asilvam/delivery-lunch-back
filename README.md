@@ -31,6 +31,54 @@
 $ npm install
 ```
 
+## MongoDB Atlas + Mongoose
+
+1. Usa Node `v22` (ver `.nvmrc`).
+2. Copia el archivo de ejemplo de variables de entorno.
+3. Configura tu URI de Atlas y el nombre de base de datos.
+
+```bash
+$ cp .env.example .env
+```
+
+Variables requeridas:
+
+- `MONGODB_URI`: cadena de conexion de MongoDB Atlas.
+- `MONGODB_DB_NAME`: nombre de la base (opcional, recomendado).
+- `PORT`: puerto HTTP de la API.
+
+## API Endpoints - Menu
+
+### Crear menú completo (4 días)
+
+```bash
+POST /menu
+Content-Type: application/json
+```
+
+Body: Ver `INSOMNIA_REQUESTS.md` o `insomnia-collection.json`.
+
+### Obtener todos los menús
+
+```bash
+GET /menu
+```
+
+### Obtener menú del día actual
+
+```bash
+GET /menu/today
+```
+
+## Testing en Insomnia
+
+1. Descarga la colección: `insomnia-collection.json`
+2. En **Insomnia**: Click en **Create** → **Import** → selecciona el archivo
+3. Configura el **Environment** con `base_url = http://localhost:3000`
+4. ¡Listo! Ejecuta los requests
+
+Para ver ejemplos detallados, abre `INSOMNIA_REQUESTS.md`.
+
 ## Compile and run the project
 
 ```bash
