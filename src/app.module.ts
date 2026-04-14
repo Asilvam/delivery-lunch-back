@@ -3,7 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { DishesModule } from './dishes/dishes.module';
 import { MenuModule } from './menu/menu.module';
+import { OrdersModule } from './orders/orders.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -19,7 +23,11 @@ import { MenuModule } from './menu/menu.module';
         dbName: configService.get<string>('MONGODB_DB_NAME'),
       }),
     }),
+    AuthModule,
+    DishesModule,
     MenuModule,
+    OrdersModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

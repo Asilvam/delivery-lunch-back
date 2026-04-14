@@ -1,5 +1,17 @@
-import { DailyMenuDto } from './daily-menu.dto';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class UpdateMenuDto {
-  data?: DailyMenuDto[];
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ensalada?: string[];
+
+  @IsOptional()
+  @IsString()
+  pan?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  postre?: string[];
 }

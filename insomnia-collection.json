@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-03-26T00:00:00.000Z",
+  "__export_date": "2026-04-14T00:00:00.000Z",
   "__export_source": "insomnia.desktop",
   "resources": [
     {
@@ -9,15 +9,86 @@
       "_type": "workspace",
       "parentId": null,
       "name": "Delivery Lunch API",
-      "description": "",
+      "description": "API para el sistema de pedidos de almuerzo",
       "scope": "collection"
     },
+
+    {
+      "_id": "env_local",
+      "_type": "environment",
+      "parentId": "wrk_delivery_lunch",
+      "name": "Local",
+      "data": {
+        "base_url": "http://localhost:3500",
+        "jwt_token": ""
+      }
+    },
+    {
+      "_id": "env_production",
+      "_type": "environment",
+      "parentId": "wrk_delivery_lunch",
+      "name": "Production (Fly.io)",
+      "data": {
+        "base_url": "https://delivery-lunch-back.fly.dev",
+        "jwt_token": ""
+      }
+    },
+
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_delivery_lunch",
+      "name": "Auth",
+      "description": "Autenticación JWT"
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "POST /auth/login",
+      "url": "{{ base_url }}/auth/login",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"username\": \"admin\",\n  \"password\": \"tu_password_aqui\"\n}"
+      },
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "description": "Retorna un JWT. Copia el token y pégalo en la variable jwt_token del environment."
+    },
+
     {
       "_id": "fld_menu",
       "_type": "request_group",
       "parentId": "wrk_delivery_lunch",
       "name": "Menu",
-      "description": ""
+      "description": "Gestión de menús semanales"
+    },
+    {
+      "_id": "req_get_today_menu",
+      "_type": "request",
+      "parentId": "fld_menu",
+      "name": "GET /menu/today",
+      "url": "{{ base_url }}/menu/today",
+      "method": "GET",
+      "description": "Obtiene el menú del día actual. Público."
+    },
+    {
+      "_id": "req_get_menu_by_date",
+      "_type": "request",
+      "parentId": "fld_menu",
+      "name": "GET /menu/:fecha",
+      "url": "{{ base_url }}/menu/2026-04-14",
+      "method": "GET",
+      "description": "Obtiene el menú de una fecha específica (YYYY-MM-DD). Público."
+    },
+    {
+      "_id": "req_get_all_menus",
+      "_type": "request",
+      "parentId": "fld_menu",
+      "name": "GET /menu - Get All Menus",
+      "url": "{{ base_url }}/menu",
+      "method": "GET",
+      "description": "Obtiene todos los menús. Público."
     },
     {
       "_id": "req_create_menu",
@@ -28,40 +99,297 @@
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\"data\": [{\"fecha\": \"2026-03-26\", \"ensalada\": [\"Ensalada surtida\", \"Ensalada chilena\", \"Repollo con zanahoria\"], \"pan\": \"Pan amasado\", \"postre\": [\"Flan de vainilla\", \"Jalea light\"], \"platos\": [{\"id\": \"today-1\", \"nombre\": \"Pollo asado con arroz y papas fritas\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?q=80&w=400&auto=format&fit=crop\", \"stock\": 12}, {\"id\": \"today-2\", \"nombre\": \"Pollo asado con fideos con salsa o crema\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1473093295043-cdd812d0e601?q=80&w=400&auto=format&fit=crop\", \"stock\": 5}, {\"id\": \"today-3\", \"nombre\": \"Cerdo mongoliano con arroz\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1604909052743-94e838986d24?q=80&w=400&auto=format&fit=crop\", \"stock\": 0}, {\"id\": \"today-4\", \"nombre\": \"Cerdo mongoliano con fideos\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1617093727343-374698b1b08d?q=80&w=400&auto=format&fit=crop\", \"stock\": 3}, {\"id\": \"today-5\", \"nombre\": \"Porotos con riendas\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1625943555403-8c4a5f5cfb89?q=80&w=400&auto=format&fit=crop\", \"stock\": 8}, {\"id\": \"today-6\", \"nombre\": \"Hipo (elige proteina)\", \"precio\": 5500, \"opciones\": [\"Pollo asado\", \"Cerdo mongoliano\", \"Atun\"], \"es_hipo\": true, \"imagen_url\": \"https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=400&auto=format&fit=crop\", \"stock\": 2}]}, {\"fecha\": \"2026-03-27\", \"ensalada\": [\"Ensalada surtida\", \"Apio con palta\"], \"pan\": \"Pan amasado\", \"postre\": [\"Postre del dia\"], \"platos\": [{\"id\": \"other-1-1\", \"nombre\": \"Pollo asado con arroz y papas fritas\", \"precio\": 5500, \"stock\": 9}, {\"id\": \"other-1-2\", \"nombre\": \"Pollo asado con fideos con salsa o crema\", \"precio\": 5500, \"stock\": 4}, {\"id\": \"other-1-3\", \"nombre\": \"Bife de cerdo con arroz y papas fritas\", \"precio\": 5500, \"stock\": 6}, {\"id\": \"other-1-4\", \"nombre\": \"Bife de cerdo con fideos con salsa o crema\", \"precio\": 5500, \"stock\": 0}, {\"id\": \"other-1-5\", \"nombre\": \"Pantrucas\", \"precio\": 5500, \"stock\": 7}, {\"id\": \"other-1-6\", \"nombre\": \"Hipo (elige proteina)\", \"precio\": 5500, \"opciones\": [\"Pechuga asada\", \"Bife de cerdo\", \"Atun\"], \"es_hipo\": true, \"stock\": 5}]}, {\"fecha\": \"2026-03-28\", \"ensalada\": [\"Ensalada surtida\"], \"pan\": \"Pan amasado\", \"postre\": [\"Leche asada\", \"Fruta de la estacion\"], \"platos\": [{\"id\": \"other-2-1\", \"nombre\": \"Cazuela de pollo\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=400&auto=format&fit=crop\", \"stock\": 10}, {\"id\": \"other-2-2\", \"nombre\": \"Zapallo italiano\", \"precio\": 5500, \"imagen_url\": \"https://images.unsplash.com/photo-1590779033100-9f60a05a013d?q=80&w=400&auto=format&fit=crop\", \"stock\": 1}, {\"id\": \"other-2-3\", \"nombre\": \"Cerdo mongoliano con fideos\", \"precio\": 5500, \"stock\": 5}, {\"id\": \"other-2-4\", \"nombre\": \"Cerdo mongoliano con arroz\", \"precio\": 5500, \"stock\": 0}, {\"id\": \"other-2-5\", \"nombre\": \"Hipo (elige proteina)\", \"precio\": 5500, \"opciones\": [\"Pollo de cazuela\", \"Zapallo italiano\", \"Cerdo mongoliano\"], \"es_hipo\": true, \"stock\": 4}]}, {\"fecha\": \"2026-03-29\", \"ensalada\": [\"Ensalada surtida\"], \"pan\": \"Pan amasado\", \"postre\": [\"Postre del dia\"], \"platos\": [{\"id\": \"other-3-1\", \"nombre\": \"Pollo asado con arroz y papas fritas\", \"precio\": 5500, \"stock\": 11}, {\"id\": \"other-3-2\", \"nombre\": \"Cerdo mongoliano con arroz\", \"precio\": 5500, \"stock\": 2}, {\"id\": \"other-3-3\", \"nombre\": \"Pantrucas\", \"precio\": 5500, \"stock\": 5}, {\"id\": \"other-3-4\", \"nombre\": \"Hipo (elige proteina)\", \"precio\": 5500, \"opciones\": [\"Pollo asado\", \"Bife de cerdo\", \"Atun\"], \"es_hipo\": true, \"stock\": 0}]}]}"
+        "text": "{\n  \"fecha\": \"2026-04-14\",\n  \"ensalada\": [\"Ensalada surtida\", \"Ensalada chilena\", \"Repollo con zanahoria\"],\n  \"pan\": \"Pan amasado\",\n  \"postre\": [\"Flan de vainilla\", \"Jalea light\"]\n}"
       },
       "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ]
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Crea un nuevo menú. Requiere JWT de admin."
     },
     {
-      "_id": "req_get_all_menus",
+      "_id": "req_copy_menu",
       "_type": "request",
       "parentId": "fld_menu",
-      "name": "GET /menu - Get All Menus",
-      "url": "{{ base_url }}/menu",
-      "method": "GET"
+      "name": "POST /menu/:id/copy",
+      "url": "{{ base_url }}/menu/MENU_ID_AQUI/copy?fecha=2026-04-15",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Copia un menú existente a una nueva fecha. Requiere JWT de admin. Reemplaza MENU_ID_AQUI con el _id del menú a copiar."
     },
     {
-      "_id": "req_get_today_menu",
+      "_id": "req_update_menu",
       "_type": "request",
       "parentId": "fld_menu",
-      "name": "GET /menu/today - Get Today Menu",
-      "url": "{{ base_url }}/menu/today",
-      "method": "GET"
+      "name": "PATCH /menu/:id",
+      "url": "{{ base_url }}/menu/MENU_ID_AQUI",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"ensalada\": [\"Ensalada surtida\", \"Apio con palta\"],\n  \"pan\": \"Pan integral\",\n  \"postre\": [\"Postre del dia\"]\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Actualiza ensalada, pan o postre de un menú. Requiere JWT de admin."
     },
     {
-      "_id": "env_base",
-      "_type": "environment",
+      "_id": "req_delete_menu",
+      "_type": "request",
+      "parentId": "fld_menu",
+      "name": "DELETE /menu/:id",
+      "url": "{{ base_url }}/menu/MENU_ID_AQUI",
+      "method": "DELETE",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Elimina un menú. Devuelve 204. Requiere JWT de admin."
+    },
+
+    {
+      "_id": "fld_dishes",
+      "_type": "request_group",
       "parentId": "wrk_delivery_lunch",
-      "name": "Base Environment",
-      "data": {
-        "base_url": "http://localhost:3000"
-      }
+      "name": "Dishes",
+      "description": "Gestión de platos dentro de un menú"
+    },
+    {
+      "_id": "req_create_dish",
+      "_type": "request",
+      "parentId": "fld_dishes",
+      "name": "POST /dishes - Create Dish",
+      "url": "{{ base_url }}/dishes",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"menuId\": \"MENU_ID_AQUI\",\n  \"nombre\": \"Pollo asado con arroz y papas fritas\",\n  \"precio\": 5500,\n  \"imagen_url\": \"https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?q=80&w=400&auto=format&fit=crop\",\n  \"opciones\": [],\n  \"es_hipo\": false,\n  \"stock\": 10\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Crea un plato asociado a un menú. Requiere JWT."
+    },
+    {
+      "_id": "req_create_dish_hipo",
+      "_type": "request",
+      "parentId": "fld_dishes",
+      "name": "POST /dishes - Create Dish (Hipo)",
+      "url": "{{ base_url }}/dishes",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"menuId\": \"MENU_ID_AQUI\",\n  \"nombre\": \"Hipo (elige proteina)\",\n  \"precio\": 5500,\n  \"imagen_url\": \"https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=400&auto=format&fit=crop\",\n  \"opciones\": [\"Pollo asado\", \"Cerdo mongoliano\", \"Atun\"],\n  \"es_hipo\": true,\n  \"stock\": 5\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Crea un plato hipoalergénico con opciones de proteína. Requiere JWT."
+    },
+    {
+      "_id": "req_update_dish",
+      "_type": "request",
+      "parentId": "fld_dishes",
+      "name": "PATCH /dishes/:id - Update Dish",
+      "url": "{{ base_url }}/dishes/DISH_ID_AQUI",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nombre\": \"Pollo asado con fideos\",\n  \"precio\": 5500,\n  \"imagen_url\": \"https://images.unsplash.com/photo-1473093295043-cdd812d0e601?q=80&w=400&auto=format&fit=crop\",\n  \"es_hipo\": false\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Actualiza datos de un plato. Requiere JWT."
+    },
+    {
+      "_id": "req_update_stock",
+      "_type": "request",
+      "parentId": "fld_dishes",
+      "name": "PATCH /dishes/:id/stock - Update Stock",
+      "url": "{{ base_url }}/dishes/DISH_ID_AQUI/stock",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"stock\": 8\n}"
+      },
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "description": "Actualiza el stock de un plato. Endpoint PÚBLICO (sin auth)."
+    },
+    {
+      "_id": "req_delete_dish",
+      "_type": "request",
+      "parentId": "fld_dishes",
+      "name": "DELETE /dishes/:id",
+      "url": "{{ base_url }}/dishes/DISH_ID_AQUI",
+      "method": "DELETE",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Elimina un plato. Devuelve 204. Requiere JWT."
+    },
+
+    {
+      "_id": "fld_orders",
+      "_type": "request_group",
+      "parentId": "wrk_delivery_lunch",
+      "name": "Orders",
+      "description": "Gestión de pedidos"
+    },
+    {
+      "_id": "req_create_order",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "POST /orders - Create Order",
+      "url": "{{ base_url }}/orders",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"menuId\": \"MENU_ID_AQUI\",\n  \"fecha\": \"2026-04-14\",\n  \"cliente\": \"Juan Pérez\",\n  \"telefono\": \"+56912345678\",\n  \"total\": 5500,\n  \"items\": [\n    {\n      \"platoId\": \"DISH_ID_AQUI\",\n      \"nombre\": \"Pollo asado con arroz y papas fritas\",\n      \"cantidad\": 1,\n      \"precio\": 5500,\n      \"selecciones\": {}\n    }\n  ]\n}"
+      },
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "description": "Crea un pedido. Endpoint PÚBLICO (cualquier cliente puede usarlo)."
+    },
+    {
+      "_id": "req_create_order_hipo",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "POST /orders - Create Order (Hipo con selección)",
+      "url": "{{ base_url }}/orders",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"menuId\": \"MENU_ID_AQUI\",\n  \"fecha\": \"2026-04-14\",\n  \"cliente\": \"María González\",\n  \"telefono\": \"+56987654321\",\n  \"total\": 5500,\n  \"items\": [\n    {\n      \"platoId\": \"DISH_HIPO_ID_AQUI\",\n      \"nombre\": \"Hipo (elige proteina)\",\n      \"cantidad\": 1,\n      \"precio\": 5500,\n      \"selecciones\": {\n        \"proteina\": \"Pollo asado\"\n      }\n    }\n  ]\n}"
+      },
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "description": "Pedido con plato hipoalergénico y selección de proteína."
+    },
+    {
+      "_id": "req_get_orders",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "GET /orders - Get All Orders",
+      "url": "{{ base_url }}/orders",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Lista todos los pedidos. Requiere JWT + rol admin. Query param opcional: ?estado=pendiente"
+    },
+    {
+      "_id": "req_get_orders_by_status",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "GET /orders?estado=pendiente",
+      "url": "{{ base_url }}/orders?estado=pendiente",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Lista pedidos filtrados por estado. Valores: pendiente | en_preparacion | entregado | cancelado. Requiere JWT + rol admin."
+    },
+    {
+      "_id": "req_update_order_status",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "PATCH /orders/:id/status",
+      "url": "{{ base_url }}/orders/ORDER_ID_AQUI/status",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"estado\": \"en_preparacion\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Cambia el estado de un pedido. Estados: pendiente | en_preparacion | entregado | cancelado. Requiere JWT + rol admin o kitchen."
+    },
+    {
+      "_id": "req_cancel_order",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "PATCH /orders/:id/cancel",
+      "url": "{{ base_url }}/orders/ORDER_ID_AQUI/cancel",
+      "method": "PATCH",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Cancela un pedido. Requiere JWT + rol admin."
+    },
+    {
+      "_id": "req_admin_validate_order",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "PATCH /orders/:id/admin-validate",
+      "url": "{{ base_url }}/orders/ORDER_ID_AQUI/admin-validate",
+      "method": "PATCH",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Marca un pedido como validado por admin. Requiere JWT + rol admin."
+    },
+    {
+      "_id": "req_sse_admin",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "GET /orders/stream/admin (SSE)",
+      "url": "{{ base_url }}/orders/stream/admin",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" },
+        { "name": "Accept", "value": "text/event-stream" }
+      ],
+      "description": "Stream SSE de pedidos para admin. Hace replay de pedidos pendientes al conectar. Requiere JWT + rol admin."
+    },
+    {
+      "_id": "req_sse_kitchen",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "GET /orders/stream/kitchen (SSE)",
+      "url": "{{ base_url }}/orders/stream/kitchen",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" },
+        { "name": "Accept", "value": "text/event-stream" }
+      ],
+      "description": "Stream SSE de pedidos para cocina. Requiere JWT + rol admin o kitchen."
+    },
+
+    {
+      "_id": "fld_upload",
+      "_type": "request_group",
+      "parentId": "wrk_delivery_lunch",
+      "name": "Upload",
+      "description": "Subida de imágenes a Cloudinary"
+    },
+    {
+      "_id": "req_upload_image",
+      "_type": "request",
+      "parentId": "fld_upload",
+      "name": "POST /upload/image",
+      "url": "{{ base_url }}/upload/image",
+      "method": "POST",
+      "body": {
+        "mimeType": "multipart/form-data",
+        "params": [
+          {
+            "name": "file",
+            "value": "",
+            "type": "file",
+            "description": "Selecciona una imagen (jpg, png, webp)"
+          }
+        ]
+      },
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt_token }}" }
+      ],
+      "description": "Sube una imagen a Cloudinary. Devuelve la URL pública. Requiere JWT. Campo: 'file' (multipart/form-data)."
     }
   ]
 }
-
