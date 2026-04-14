@@ -1,0 +1,49 @@
+# Dependencias
+node_modules/
+
+# Build output
+dist/
+
+# Variables de entorno (NUNCA incluir en imagen)
+.env
+.env.*
+!.env.example
+
+# Archivos de desarrollo / tests
+test/
+**/*.spec.ts
+**/*.e2e-spec.ts
+jest.config.*
+jest-e2e.json
+
+# Git
+.git/
+.gitignore
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentación y colecciones (no van en la imagen)
+*.md
+insomnia-collection.json
+INSOMNIA_REQUESTS.md
+
+# TypeScript sources (ya están compiladas en dist/)
+src/
+
+# Seeds (solo para desarrollo/local)
+src/database/
+
+# Cobertura de tests
+coverage/
