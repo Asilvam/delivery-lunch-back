@@ -68,7 +68,6 @@ npm run start:prod
 | `POST`  | `/auth/login`       | Login — devuelve JWT          |
 | `GET`   | `/menu/today`       | Menú del día actual           |
 | `GET`   | `/menu/:fecha`      | Menú por fecha (`YYYY-MM-DD`) |
-| `GET`   | `/menu`             | Todos los menús               |
 | `POST`  | `/orders`           | Crear pedido                  |
 | `PATCH` | `/dishes/:id/stock` | Actualizar stock de un plato  |
 
