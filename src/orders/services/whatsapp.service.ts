@@ -58,7 +58,7 @@ export class WhatsappService {
       `Nuevo pedido - ${order.cliente}`,
       `Telefono: ${order.telefono ?? 'no informado'}`,
       `Fecha: ${order.fecha}`,
-      '---',
+      '--- * ---',
     ];
 
     for (const item of order.items) {
@@ -69,7 +69,7 @@ export class WhatsappService {
       }
     }
 
-    lines.push('---');
+    lines.push('--- * ---');
     lines.push('Total: $  ' + new Intl.NumberFormat('es-CL').format(order.total));
 
     return lines.join('\n');
