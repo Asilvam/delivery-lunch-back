@@ -39,11 +39,5 @@ Thumbs.db
 insomnia-collection.json
 INSOMNIA_REQUESTS.md
 
-# TypeScript sources (ya están compiladas en dist/)
-src/
-
-# Seeds (solo para desarrollo/local)
-src/database/
-
 # Cobertura de tests
 coverage/

@@ -1,43 +1,30 @@
-# fly.toml — Delivery Lunch Back
-# Generado para fly.io deploy
-# Documentación: https://fly.io/docs/reference/configuration/
+# fly.toml app configuration file generated for delivery-lunch-back on 2026-04-14T07:05:27-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "delivery-lunch-back"
-primary_region = "gru"  # São Paulo — más cercano a Chile
+app = 'delivery-lunch-back'
+primary_region = 'gru'
 
 [build]
-  dockerfile = "Dockerfile"
 
 [env]
   NODE_ENV = "production"
   PORT = "3500"
 
-# Las variables sensibles NO van aquí — usar fly secrets set:
-#
-#   fly secrets set MONGODB_URI="mongodb+srv://..."
-#   fly secrets set MONGODB_DB_NAME="delivery_lunch"
-#   fly secrets set JWT_SECRET="..."
-#   fly secrets set JWT_EXPIRES_IN="7d"
-#   fly secrets set ADMIN_USERNAME="admin"
-#   fly secrets set ADMIN_PASSWORD_HASH="$2b$10$..."
-#   fly secrets set CLOUDINARY_CLOUD_NAME="..."
-#   fly secrets set CLOUDINARY_API_KEY="..."
-#   fly secrets set CLOUDINARY_API_SECRET="..."
-#   fly secrets set WHATSAPP_NOTIFY_PHONE="..."
-#   fly secrets set CALLMEBOT_API_KEY="..."
+# Variables sensibles — NO van aquí, usar:
+# fly secrets set MONGODB_URI="..." JWT_SECRET="..." etc.
 
 [http_service]
   internal_port = 3500
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
-
-  [http_service.concurrency]
-    type = "connections"
-    hard_limit = 100
-    soft_limit = 80
+  processes = ['app']
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

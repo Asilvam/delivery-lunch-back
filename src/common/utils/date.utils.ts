@@ -1,11 +1,20 @@
-import { ISO_DATE_LENGTH } from './date.constants';
+import { DateTime } from 'luxon';
 
+const SANTIAGO_TZ = 'America/Santiago';
+
+/**
+ * Convierte un objeto Date a string "YYYY-MM-DD" en hora local de Santiago de Chile.
+ * Reemplaza el uso de toISOString() que siempre devuelve UTC.
+ */
 export const toIsoDate = (date: Date): string => {
-  return date.toISOString().slice(0, ISO_DATE_LENGTH);
+  return DateTime.fromJSDate(date, { zone: SANTIAGO_TZ }).toISODate()!;
 };
 
+/**
+ * Suma días a una fecha manteniendo la zona horaria de Santiago.
+ */
 export const addDays = (date: Date, days: number): Date => {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
+  return DateTime.fromJSDate(date, { zone: SANTIAGO_TZ })
+    .plus({ days })
+    .toJSDate();
 };

@@ -70,7 +70,7 @@ export class WhatsappService {
     }
 
     lines.push('---');
-    lines.push(`Total: $${order.total.toLocaleString('es-CL')}`);
+    lines.push('Total: $  ' + new Intl.NumberFormat('es-CL').format(order.total));
 
     return lines.join('\n');
   }
