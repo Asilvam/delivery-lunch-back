@@ -56,3 +56,7 @@ export class Order {
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
+
+OrderSchema.index({ createdAt: -1 });
+OrderSchema.index({ estado: 1, createdAt: -1 });
+OrderSchema.index({ 'items.platoId': 1 });
