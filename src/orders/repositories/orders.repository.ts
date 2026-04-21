@@ -73,10 +73,17 @@ export class OrdersRepository {
   async updateStatus(
     id: string,
     estado: OrderStatus,
+    timestamps?: { aceptadoEn?: Date; entregadoEn?: Date; canceladoEn?: Date },
   ): Promise<OrderDocument | null> {
     this.logger.log(`Actualizando estado pedido ${id} -> ${estado}`);
+    const update: Partial<Order> = { estado };
+    if (timestamps) {
+      if (timestamps.aceptadoEn) update.aceptadoEn = timestamps.aceptadoEn;
+      if (timestamps.entregadoEn) update.entregadoEn = timestamps.entregadoEn;
+      if (timestamps.canceladoEn) update.canceladoEn = timestamps.canceladoEn;
+    }
     return this.orderModel
-      .findByIdAndUpdate(id, { $set: { estado } }, { new: true })
+      .findByIdAndUpdate(id, { $set: update }, { new: true })
       .exec();
   }
 

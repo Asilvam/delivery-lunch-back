@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { DateTime } from 'luxon';
 import { Types } from 'mongoose';
 import { DishesRepository } from '../dishes/repositories/dishes.repository';
 import { MenuRepository } from '../menu/repositories/menu.repository';
@@ -14,6 +15,8 @@ import { OrdersRepository } from './repositories/orders.repository';
 import { OrderDocument } from './schemas/order.schema';
 import { OrdersSseService } from './services/orders-sse.service';
 import { WhatsappService } from './services/whatsapp.service';
+
+const SANTIAGO_TZ = 'America/Santiago';
 
 @Injectable()
 export class OrdersService {
@@ -173,9 +176,12 @@ export class OrdersService {
     }
 
     // 4. Actualizar estado a cancelado en MongoDB
+    const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
+    this.logger.log(`Pedido ${id} cancelado — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
     const cancelled = await this.ordersRepository.updateStatus(
       id,
       OrderStatus.CANCELADO,
+      { canceladoEn: ahora },
     );
 
     if (!cancelled) {
@@ -202,7 +208,21 @@ export class OrdersService {
   ): Promise<OrderDocument> {
     this.logger.log(`Actualizando estado pedido ${id} -> ${dto.estado}`);
 
-    const order = await this.ordersRepository.updateStatus(id, dto.estado);
+    const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
+    const timestamps: { aceptadoEn?: Date; entregadoEn?: Date; canceladoEn?: Date } = {};
+
+    if (dto.estado === OrderStatus.EN_PREPARACION) {
+      timestamps.aceptadoEn = ahora;
+      this.logger.log(`Pedido ${id} pasa a EN_PREPARACION — aceptadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+    } else if (dto.estado === OrderStatus.ENTREGADO) {
+      timestamps.entregadoEn = ahora;
+      this.logger.log(`Pedido ${id} pasa a ENTREGADO — entregadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+    } else if (dto.estado === OrderStatus.CANCELADO) {
+      timestamps.canceladoEn = ahora;
+      this.logger.log(`Pedido ${id} pasa a CANCELADO — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+    }
+
+    const order = await this.ordersRepository.updateStatus(id, dto.estado, timestamps);
 
     if (!order) {
       this.logger.warn(

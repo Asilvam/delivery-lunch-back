@@ -53,6 +53,15 @@ export class Order {
 
   @Prop({ type: Boolean, default: false })
   validadoPorAdmin: boolean;
+
+  @Prop({ type: Date })
+  aceptadoEn?: Date;
+
+  @Prop({ type: Date })
+  entregadoEn?: Date;
+
+  @Prop({ type: Date })
+  canceladoEn?: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
