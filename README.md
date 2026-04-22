@@ -88,7 +88,8 @@ npm run start:prod
 
 | Método  | Endpoint                     | Descripción                            |
 | ------- | ---------------------------- | -------------------------------------- |
-| `GET`   | `/orders`                    | Listar pedidos (filtro: `?estado=...`) |
+| `GET`   | `/orders`                    | Listar pedidos aprobados por admin (filtro: `?estado=...`) |
+| `GET`   | `/orders/by-date`            | Listar pedidos aprobados por admin en una fecha específica (`?date=YYYY-MM-DD`) |
 | `GET`   | `/orders/stream/admin`       | SSE — stream de pedidos (admin)        |
 | `PATCH` | `/orders/:id/cancel`         | Cancelar pedido                        |
 | `PATCH` | `/orders/:id/admin-validate` | Validar pedido como admin              |
@@ -101,6 +102,14 @@ npm run start:prod
 | `PATCH` | `/orders/:id/status`     | Cambiar estado del pedido        |
 
 **Estados de pedido:** `pendiente` | `en_preparacion` | `entregado` | `cancelado`
+
+---
+
+## Filtrado y detalle de pedidos
+
+- Para obtener pedidos por estado: `/orders?estado=entregado` (o cualquier estado válido)
+- Para obtener pedidos por fecha: `/orders/by-date?date=YYYY-MM-DD`
+- Solo se listan pedidos aprobados por admin (`validadoPorAdmin: true`)
 
 ---
 

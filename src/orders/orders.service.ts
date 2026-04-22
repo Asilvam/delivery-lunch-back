@@ -252,10 +252,12 @@ export class OrdersService {
     return order;
   }
 
-  async findAll(estado?: OrderStatus): Promise<OrderDocument[]> {
-    this.logger.log(
-      `Listando pedidos${estado ? ` con estado: ${estado}` : ''}`,
-    );
-    return this.ordersRepository.findAll(estado);
+  async findAll(): Promise<OrderDocument[]> {
+    this.logger.log(`Listando pedidos — validadoPorAdmin`);
+    return this.ordersRepository.findAll();
+  }
+
+  async findByDate(date: string): Promise<OrderDocument[]> {
+    return this.ordersRepository.findByDate(date);
   }
 }

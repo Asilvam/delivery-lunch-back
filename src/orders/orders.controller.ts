@@ -7,7 +7,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   Res,
   Sse,
   UseGuards,
@@ -17,7 +16,6 @@ import { Observable, concat, map } from 'rxjs';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { OrderStatus } from './constants/order.constants';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
@@ -49,15 +47,15 @@ export class OrdersController {
 
   /**
    * GET /orders
-   * Lista todos los pedidos. Acepta query param ?estado= para filtrar.
+   * Lista todos los pedidos Aceptados por el admin
    * Requiere JWT + rol admin.
    */
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async findAll(@Query('estado') estado?: OrderStatus) {
-    this.logger.log(`GET /orders${estado ? `?estado=${estado}` : ''}`);
-    return this.ordersService.findAll(estado);
+  async findAll() {
+    this.logger.log(`GET /orders`);
+    return this.ordersService.findAll();
   }
 
   /**

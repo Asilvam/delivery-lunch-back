@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { DateTime } from 'luxon';
 import { OrderStatus } from '../constants/order.constants';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { Order, OrderDocument } from '../schemas/order.schema';
@@ -35,10 +36,10 @@ export class OrdersRepository {
     return this.orderModel.findById(id).exec();
   }
 
-  async findAll(estado?: OrderStatus): Promise<OrderDocument[]> {
-    const filter = estado ? { estado } : {};
+  async findAll(): Promise<OrderDocument[]> {
+    const filter = { validadoPorAdmin: true };
     this.logger.log(
-      `Listando pedidos${estado ? ` con estado: ${estado}` : ''}`,
+      `Listando pedidos — validadoPorAdmin: ${filter.validadoPorAdmin}`,
     );
     return this.orderModel.find(filter).sort({ createdAt: -1 }).exec();
   }
@@ -63,7 +64,7 @@ export class OrdersRepository {
     this.logger.log('Buscando pedidos pendientes en cocina');
     return this.orderModel
       .find({
-        validadoPorAdmin: true,
+        validadoPorAdmin: { $eq: true },
         estado: { $in: [OrderStatus.PENDIENTE, OrderStatus.EN_PREPARACION] },
       })
       .sort({ createdAt: 1 })
@@ -95,6 +96,24 @@ export class OrdersRepository {
         { $set: { validadoPorAdmin: true } },
         { new: true },
       )
+      .exec();
+  }
+
+  async findByDate(date: string): Promise<OrderDocument[]> {
+    this.logger.log(`Buscando pedidos por fecha: ${date}`);
+    // Validar y parsear fecha con Luxon
+    const dt = DateTime.fromISO(date, { zone: 'America/Santiago' });
+    if (!dt.isValid) {
+      this.logger.warn(`Fecha inválida: ${date}`);
+      return [];
+    }
+    const start = dt.startOf('day').toJSDate();
+    const end = dt.endOf('day').toJSDate();
+    return this.orderModel
+      .find({
+        createdAt: { $gte: start, $lte: end },
+      })
+      .sort({ createdAt: -1 })
       .exec();
   }
 }
