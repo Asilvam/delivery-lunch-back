@@ -8,7 +8,7 @@ import { StatisticsService } from './statistics.service';
   imports: [
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
   ],
-  controllers: [StatisticsController],
+  controllers: [StatisticsController, require('./dev-tools.controller').DevToolsController],
   providers: [StatisticsService],
   exports: [StatisticsService],
 })

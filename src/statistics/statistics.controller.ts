@@ -4,6 +4,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { StatisticsService } from './statistics.service';
 
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+
+@ApiTags('statistics')
+@ApiBearerAuth()
 @Controller('statistics')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')

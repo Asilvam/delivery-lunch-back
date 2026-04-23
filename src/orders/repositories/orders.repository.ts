@@ -36,10 +36,18 @@ export class OrdersRepository {
     return this.orderModel.findById(id).exec();
   }
 
-  async findAll(): Promise<OrderDocument[]> {
+  async findAllByAdminTrue(): Promise<OrderDocument[]> {
     const filter = { validadoPorAdmin: true };
     this.logger.log(
       `Listando pedidos — validadoPorAdmin: ${filter.validadoPorAdmin}`,
+    );
+    return this.orderModel.find(filter).sort({ createdAt: -1 }).exec();
+  }
+
+  async findAll(estado?: OrderStatus): Promise<OrderDocument[]> {
+    const filter = estado ? { estado } : {};
+    this.logger.log(
+      `Listando pedidos${estado ? ` con estado: ${estado}` : ''}`,
     );
     return this.orderModel.find(filter).sort({ createdAt: -1 }).exec();
   }

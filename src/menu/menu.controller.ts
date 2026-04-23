@@ -19,16 +19,23 @@ import { MenuService } from './menu.service';
 import { Menu } from './schemas/menu.schema';
 import { MenuWithDishes } from './types/menu-with-dishes.type';
 
+import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
+import { MenuWithDishesDto } from './dto/menu-with-dishes.dto';
+
+@ApiTags('menu')
+@ApiBearerAuth()
 @Controller('menu')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 
   @Get('today')
+  @ApiOkResponse({ description: 'Menú del día', type: [MenuWithDishesDto] })
   async findToday(): Promise<MenuWithDishes[]> {
     return this.menuService.findToday();
   }
 
   @Get(':fecha')
+  @ApiOkResponse({ description: 'Menú de una fecha', type: [MenuWithDishesDto] })
   async findByFecha(@Param('fecha') fecha: string): Promise<MenuWithDishes[]> {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
       throw new BadRequestException('fecha debe tener formato YYYY-MM-DD');
@@ -39,6 +46,7 @@ export class MenuController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @ApiBody({ type: CreateMenuDto })
   async create(@Body() createMenuDto: CreateMenuDto): Promise<Menu> {
     return this.menuService.create(createMenuDto);
   }
@@ -60,6 +68,7 @@ export class MenuController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
+  @ApiBody({ type: UpdateMenuDto })
   async update(
     @Param('id') id: string,
     @Body() updateMenuDto: UpdateMenuDto,

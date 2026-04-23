@@ -177,7 +177,9 @@ export class OrdersService {
 
     // 4. Actualizar estado a cancelado en MongoDB
     const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
-    this.logger.log(`Pedido ${id} cancelado — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+    this.logger.log(
+      `Pedido ${id} cancelado — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
+    );
     const cancelled = await this.ordersRepository.updateStatus(
       id,
       OrderStatus.CANCELADO,
@@ -209,20 +211,34 @@ export class OrdersService {
     this.logger.log(`Actualizando estado pedido ${id} -> ${dto.estado}`);
 
     const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
-    const timestamps: { aceptadoEn?: Date; entregadoEn?: Date; canceladoEn?: Date } = {};
+    const timestamps: {
+      aceptadoEn?: Date;
+      entregadoEn?: Date;
+      canceladoEn?: Date;
+    } = {};
 
     if (dto.estado === OrderStatus.EN_PREPARACION) {
       timestamps.aceptadoEn = ahora;
-      this.logger.log(`Pedido ${id} pasa a EN_PREPARACION — aceptadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+      this.logger.log(
+        `Pedido ${id} pasa a EN_PREPARACION — aceptadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
+      );
     } else if (dto.estado === OrderStatus.ENTREGADO) {
       timestamps.entregadoEn = ahora;
-      this.logger.log(`Pedido ${id} pasa a ENTREGADO — entregadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+      this.logger.log(
+        `Pedido ${id} pasa a ENTREGADO — entregadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
+      );
     } else if (dto.estado === OrderStatus.CANCELADO) {
       timestamps.canceladoEn = ahora;
-      this.logger.log(`Pedido ${id} pasa a CANCELADO — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`);
+      this.logger.log(
+        `Pedido ${id} pasa a CANCELADO — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
+      );
     }
 
-    const order = await this.ordersRepository.updateStatus(id, dto.estado, timestamps);
+    const order = await this.ordersRepository.updateStatus(
+      id,
+      dto.estado,
+      timestamps,
+    );
 
     if (!order) {
       this.logger.warn(
@@ -252,9 +268,16 @@ export class OrdersService {
     return order;
   }
 
-  async findAll(): Promise<OrderDocument[]> {
+  async findAllByAdminTrue(): Promise<OrderDocument[]> {
     this.logger.log(`Listando pedidos — validadoPorAdmin`);
-    return this.ordersRepository.findAll();
+    return this.ordersRepository.findAllByAdminTrue();
+  }
+
+  async findAll(estado?: OrderStatus): Promise<OrderDocument[]> {
+    this.logger.log(
+      `Listando pedidos${estado ? ` con estado: ${estado}` : ''}`,
+    );
+    return this.ordersRepository.findAll(estado);
   }
 
   async findByDate(date: string): Promise<OrderDocument[]> {

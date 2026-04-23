@@ -53,6 +53,16 @@ interface CancellationAggregateResult {
 
 @Injectable()
 export class StatisticsService {
+  /**
+   * Limpia el cache de estadísticas en memoria (usado tras seed/reset de datos)
+   */
+  public clearCache(): void {
+    this.logger.warn(
+      'Limpiando todos los datos de cache de estadísticas (reset manual)',
+    );
+    this.cache.clear();
+  }
+
   private readonly logger = new Logger(StatisticsService.name);
   private readonly cache = new Map<string, CacheEntry<unknown>>();
 
@@ -102,6 +112,7 @@ export class StatisticsService {
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
+          estado: { $in: [OrderStatus.ENTREGADO, OrderStatus.CANCELADO] },
         },
       },
       {
@@ -157,7 +168,7 @@ export class StatisticsService {
       },
     };
 
-    this.setCache(cacheKey, summary, 5);
+    this.setCache(cacheKey, summary, 1);
     return summary;
   }
 
@@ -178,7 +189,9 @@ export class StatisticsService {
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
-          estado: { $nin: [OrderStatus.CANCELADO] },
+          estado: {
+            $in: [OrderStatus.ENTREGADO],
+          },
         },
       },
       { $unwind: '$items' },
@@ -279,7 +292,7 @@ export class StatisticsService {
       {
         $match: {
           createdAt: { $gte: start, $lte: end },
-          estado: { $nin: [OrderStatus.CANCELADO] },
+          estado: { $in: [OrderStatus.ENTREGADO] },
         },
       },
       {
