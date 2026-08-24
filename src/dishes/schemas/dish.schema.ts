@@ -26,6 +26,9 @@ export class Dish {
 
   @Prop({ default: 0 })
   stock: number;
+
+  @Prop({ default: 0 })
+  orden: number;
 }
 
 export const DishSchema = SchemaFactory.createForClass(Dish);

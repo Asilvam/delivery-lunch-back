@@ -5,6 +5,7 @@ Backend del sistema de pedidos de almuerzo de **Sabores Angelicales**. Expone la
 ## Funcionalidades
 
 - Menús diarios y catálogo de platos.
+- Gestión administrativa de menús como borrador, publicados o archivados.
 - Creación de pedidos con validación y descuento de stock.
 - Validación administrativa antes de enviar pedidos a cocina.
 - Gestión del ciclo de preparación, entrega y cancelación.
@@ -87,28 +88,26 @@ La API local queda disponible normalmente en `http://localhost:3500`.
 | --- | --- | --- |
 | `GET` | `/` | Comprobación básica del servicio. |
 | `POST` | `/auth/login` | Inicia sesión y devuelve `access_token`. |
-| `GET` | `/menu/today` | Obtiene el menú del día; devuelve `[]` si no existe. |
-| `GET` | `/menu/:fecha` | Obtiene el menú de una fecha `YYYY-MM-DD`; devuelve `[]` si no existe. |
+| `GET` | `/menu/today` | Obtiene el menú publicado del día; devuelve `[]` si no existe. |
+| `GET` | `/menu/:fecha` | Obtiene el menú publicado de una fecha `YYYY-MM-DD`; devuelve `[]` si no existe. |
 | `POST` | `/orders` | Crea un pedido. |
-| `PATCH` | `/dishes/:id/stock` | Actualiza el stock de un plato. |
-
-### Requiere JWT
-
-| Método | Endpoint | Descripción |
-| --- | --- | --- |
-| `POST` | `/menu` | Crea un menú. |
-| `POST` | `/menu/:id/copy?fecha=YYYY-MM-DD` | Copia un menú a otra fecha. |
-| `PATCH` | `/menu/:id` | Actualiza un menú. |
-| `DELETE` | `/menu/:id` | Elimina un menú. |
-| `POST` | `/dishes` | Crea un plato. |
-| `PATCH` | `/dishes/:id` | Actualiza un plato. |
-| `DELETE` | `/dishes/:id` | Elimina un plato. |
-| `POST` | `/upload/image` | Sube una imagen a Cloudinary. |
 
 ### Requiere rol `admin`
 
 | Método | Endpoint | Descripción |
 | --- | --- | --- |
+| `GET` | `/menu/admin/list?from=YYYY-MM-DD&to=YYYY-MM-DD` | Lista menús y platos dentro de un rango. |
+| `POST` | `/menu` | Crea un menú en borrador junto con sus platos. |
+| `POST` | `/menu/:id/copy?fecha=YYYY-MM-DD` | Duplica un menú como borrador en otra fecha. |
+| `PATCH` | `/menu/:id` | Actualiza datos y platos del menú. |
+| `PATCH` | `/menu/:id/publish` | Publica un menú y lo hace visible a clientes. |
+| `PATCH` | `/menu/:id/archive` | Archiva y oculta un menú. |
+| `DELETE` | `/menu/:id` | Elimina un menú que nunca fue publicado. |
+| `POST` | `/dishes` | Crea un plato. |
+| `PATCH` | `/dishes/:id` | Actualiza un plato. |
+| `PATCH` | `/dishes/:id/stock` | Actualiza el stock de un plato. |
+| `DELETE` | `/dishes/:id` | Elimina un plato. |
+| `POST` | `/upload/image` | Sube JPG, PNG o WebP de hasta 5 MB a Cloudinary. |
 | `GET` | `/orders?estado=...` | Lista todos los pedidos; permite filtrar por estado. |
 | `GET` | `/orders/stream/admin` | Stream SSE de pedidos nuevos para administración. |
 | `PATCH` | `/orders/:id/admin-validate` | Aprueba un pedido y lo envía a cocina. |

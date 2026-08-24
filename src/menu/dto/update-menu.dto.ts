@@ -1,4 +1,14 @@
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { MenuStatus } from '../constants/menu-status.constants';
+import { MenuDishInputDto } from './menu-dish-input.dto';
 
 export class UpdateMenuDto {
   @IsOptional()
@@ -14,4 +24,15 @@ export class UpdateMenuDto {
   @IsArray()
   @IsString({ each: true })
   postre?: string[];
+
+  @IsOptional()
+  @IsEnum(MenuStatus)
+  status?: MenuStatus;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => MenuDishInputDto)
+  platos?: MenuDishInputDto[];
 }

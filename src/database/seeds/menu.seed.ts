@@ -12,6 +12,7 @@ interface SeedMenu {
   ensalada: string[];
   pan: string;
   postre: string[];
+  status: 'published';
   platos: SeedDish[];
 }
 
@@ -21,6 +22,7 @@ export const menuSeed: SeedMenu[] = [
     ensalada: ['Ensalada surtida', 'Ensalada chilena', 'Repollo con zanahoria'],
     pan: 'Pan Fresco del dia',
     postre: ['Flan de vainilla', 'Jalea light'],
+    status: 'published',
     platos: [
       {
         nombre: 'Pollo asado con arroz y papas fritas',

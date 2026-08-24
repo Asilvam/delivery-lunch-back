@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { MENU_COLLECTION } from '../constants/menu.constants';
+import { MenuStatus } from '../constants/menu-status.constants';
 
 export type MenuDocument = HydratedDocument<Menu>;
 
@@ -17,6 +18,14 @@ export class Menu {
 
   @Prop({ type: [String], default: [] })
   postre: string[];
+
+  @Prop({
+    type: String,
+    enum: Object.values(MenuStatus),
+    default: MenuStatus.DRAFT,
+    index: true,
+  })
+  status: MenuStatus;
 }
 
 export const MenuSchema = SchemaFactory.createForClass(Menu);

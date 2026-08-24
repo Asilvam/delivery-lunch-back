@@ -39,13 +39,16 @@ async function runSeed() {
       .collection(MENU_COLLECTION)
       .insertOne({ ...menuData, createdAt: new Date(), updatedAt: new Date() });
 
-    console.log(`Menu insertado: ${seedMenu.fecha} (${menuResult.insertedId})`);
+    console.log(
+      `Menu insertado: ${seedMenu.fecha} (${String(menuResult.insertedId)})`,
+    );
 
     // Insert dishes linked to the menu
     if (platos.length > 0) {
-      const dishDocs = platos.map((plato) => ({
+      const dishDocs = platos.map((plato, orden) => ({
         ...plato,
         menuId: menuResult.insertedId,
+        orden,
         es_hipo: plato.es_hipo ?? false,
         opciones: plato.opciones ?? [],
         createdAt: new Date(),
