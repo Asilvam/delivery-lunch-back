@@ -24,10 +24,6 @@ import { OrdersRepository } from './repositories/orders.repository';
 import { SseOrderEvent, OrdersSseService } from './services/orders-sse.service';
 import { OrderStatus } from './constants/order.constants';
 
-import { ApiTags, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-
-@ApiTags('orders')
-@ApiBearerAuth()
 @Controller('orders')
 export class OrdersController {
   private readonly logger = new Logger(OrdersController.name);
@@ -44,7 +40,6 @@ export class OrdersController {
    * notifica WhatsApp al admin y emite evento SSE al canal admin.
    */
   @Post()
-  @ApiBody({ type: CreateOrderDto })
   async create(@Body() createOrderDto: CreateOrderDto) {
     this.logger.log(
       `POST /orders — cliente: "${createOrderDto.cliente}", items: ${createOrderDto.items.length}`,
@@ -54,12 +49,12 @@ export class OrdersController {
 
   /**
    * GET /orders
-   * Lista todos los pedidos Aceptados por el admin
-   * Requiere JWT + rol admin.
+   * Lista todos los pedidos aceptados por el admin.
+   * Requiere JWT + rol admin o kitchen.
    */
   @Get('ByAdminTrue')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'kitchen')
   async findAllByAdminTrue() {
     this.logger.log(`GET /orders`);
     return this.ordersService.findAllByAdminTrue();
@@ -205,7 +200,6 @@ export class OrdersController {
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'kitchen')
-  @ApiBody({ type: UpdateOrderStatusDto })
   async updateStatus(
     @Param('id') id: string,
     @Body() updateOrderStatusDto: UpdateOrderStatusDto,

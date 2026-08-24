@@ -32,7 +32,7 @@ export class MenuService {
 
     if (!menu) {
       this.logger.warn(`Menu no encontrado para fecha: ${fecha}`);
-      throw new NotFoundException(`No existe menu para la fecha ${fecha}`);
+      return [];
     }
 
     return [menu];

@@ -214,7 +214,6 @@ export class OrdersService {
     const timestamps: {
       aceptadoEn?: Date;
       entregadoEn?: Date;
-      canceladoEn?: Date;
     } = {};
 
     if (dto.estado === OrderStatus.EN_PREPARACION) {
@@ -226,11 +225,6 @@ export class OrdersService {
       timestamps.entregadoEn = ahora;
       this.logger.log(
         `Pedido ${id} pasa a ENTREGADO — entregadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
-      );
-    } else if (dto.estado === OrderStatus.CANCELADO) {
-      timestamps.canceladoEn = ahora;
-      this.logger.log(
-        `Pedido ${id} pasa a CANCELADO — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
       );
     }
 

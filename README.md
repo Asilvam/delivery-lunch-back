@@ -1,171 +1,197 @@
 # Delivery Lunch API
 
-Backend del sistema de pedidos de almuerzo. Construido con **NestJS v11**, **MongoDB Atlas** y **TypeScript**.
+Backend del sistema de pedidos de almuerzo de **Sabores Angelicales**. Expone las operaciones utilizadas por el cliente, administración, cocina y dashboard de `delivery-lunch-front`.
+
+## Funcionalidades
+
+- Menús diarios y catálogo de platos.
+- Creación de pedidos con validación y descuento de stock.
+- Validación administrativa antes de enviar pedidos a cocina.
+- Gestión del ciclo de preparación, entrega y cancelación.
+- Autenticación JWT y autorización por roles `admin` y `kitchen`.
+- Actualizaciones en tiempo real mediante Server-Sent Events (SSE).
+- Estadísticas de ventas, ingresos, platos, horas punta y cancelaciones.
+- Subida de imágenes a Cloudinary.
+- Notificaciones de pedidos mediante CallMeBot/WhatsApp.
 
 ## Stack
 
-- **Framework:** NestJS v11 (Express)
-- **Base de datos:** MongoDB Atlas + Mongoose v8
-- **Auth:** JWT + Passport.js + RBAC (roles: `admin`, `kitchen`)
-- **Upload:** Multer + Cloudinary
-- **Real-time:** Server-Sent Events (SSE) con RxJS
-- **Validación:** class-validator + class-transformer
-- **Node:** v22 (ver `.nvmrc`)
+- NestJS 11 sobre Express
+- TypeScript 5
+- Node.js 22
+- MongoDB Atlas y Mongoose 8
+- Passport y JWT
+- RxJS para SSE
+- Multer y Cloudinary
+- class-validator y class-transformer
 
----
+## Requisitos
 
-## Instalación y configuración local
+- Node.js 22, según `.nvmrc`
+- npm
+- MongoDB Atlas
+- Credenciales de Cloudinary para subir imágenes
+- Credenciales de CallMeBot si se habilitan notificaciones por WhatsApp
+
+## Configuración local
 
 ```bash
-# 1. Instalar dependencias
+nvm use
 npm install
-
-# 2. Copiar variables de entorno
 cp .env.example .env
 ```
 
-Editar `.env` con los valores reales:
+Variables disponibles:
 
-| Variable                | Descripción                           |
-| ----------------------- | ------------------------------------- |
-| `MONGODB_URI`           | Cadena de conexión de MongoDB Atlas   |
-| `MONGODB_DB_NAME`       | Nombre de la base de datos            |
-| `PORT`                  | Puerto HTTP (default: `3500`)         |
-| `JWT_SECRET`            | Secreto para firmar tokens JWT        |
-| `JWT_EXPIRES_IN`        | Expiración del token (ej. `7d`)       |
-| `ADMIN_USERNAME`        | Usuario administrador                 |
-| `ADMIN_PASSWORD_HASH`   | Hash bcrypt del password del admin    |
-| `CLOUDINARY_CLOUD_NAME` | Cloud name de Cloudinary              |
-| `CLOUDINARY_API_KEY`    | API key de Cloudinary                 |
-| `CLOUDINARY_API_SECRET` | API secret de Cloudinary              |
-| `WHATSAPP_NOTIFY_PHONE` | Teléfono para notificaciones WhatsApp |
-| `CALLMEBOT_API_KEY`     | API key de Callmebot                  |
+| Variable | Requerida | Descripción |
+| --- | --- | --- |
+| `MONGODB_URI` | Sí | Cadena de conexión de MongoDB Atlas. |
+| `MONGODB_DB_NAME` | Sí | Nombre de la base de datos. |
+| `PORT` | No | Puerto HTTP. El valor predeterminado es `3500`. |
+| `JWT_SECRET` | Sí | Secreto utilizado para firmar los JWT. |
+| `JWT_EXPIRES_IN` | No | Tiempo de expiración del token, por ejemplo `7d`. |
+| `ADMIN_USERNAME` | Sí | Nombre del usuario administrador. |
+| `ADMIN_PASSWORD_HASH` | Sí | Hash bcrypt de la contraseña del administrador. |
+| `KITCHEN_USERNAME` | No | Nombre del usuario de cocina. |
+| `KITCHEN_PASSWORD_HASH` | No | Hash bcrypt de la contraseña del usuario de cocina. |
+| `CLOUDINARY_CLOUD_NAME` | Sí para uploads | Cloud name de Cloudinary. |
+| `CLOUDINARY_API_KEY` | Sí para uploads | API key de Cloudinary. |
+| `CLOUDINARY_API_SECRET` | Sí para uploads | API secret de Cloudinary. |
+| `WHATSAPP_NOTIFY_PHONE` | No | Teléfono de destino para notificaciones. |
+| `CALLMEBOT_API_KEY` | No | API key de CallMeBot. |
 
----
-
-## Ejecutar el proyecto
+## Ejecución
 
 ```bash
-# Desarrollo (watch mode)
+# Desarrollo con recarga
 npm run start:dev
 
-# Desarrollo normal
+# Desarrollo sin watch
 npm run start
 
-# Producción
+# Build y ejecución de producción
 npm run build
 npm run start:prod
+
+# Poblar datos iniciales
+npm run seed
 ```
 
----
+La API local queda disponible normalmente en `http://localhost:3500`.
 
-## API Endpoints
+## Endpoints
 
-### Acceso público (sin auth)
+### Acceso público
 
-| Método  | Endpoint            | Descripción                   |
-| ------- | ------------------- | ----------------------------- |
-| `POST`  | `/auth/login`       | Login — devuelve JWT          |
-| `GET`   | `/menu/today`       | Menú del día actual           |
-| `GET`   | `/menu/:fecha`      | Menú por fecha (`YYYY-MM-DD`) |
-| `POST`  | `/orders`           | Crear pedido                  |
-| `PATCH` | `/dishes/:id/stock` | Actualizar stock de un plato  |
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/` | Comprobación básica del servicio. |
+| `POST` | `/auth/login` | Inicia sesión y devuelve `access_token`. |
+| `GET` | `/menu/today` | Obtiene el menú del día; devuelve `[]` si no existe. |
+| `GET` | `/menu/:fecha` | Obtiene el menú de una fecha `YYYY-MM-DD`; devuelve `[]` si no existe. |
+| `POST` | `/orders` | Crea un pedido. |
+| `PATCH` | `/dishes/:id/stock` | Actualiza el stock de un plato. |
 
-### Requiere JWT (`Authorization: Bearer <token>`)
+### Requiere JWT
 
-| Método   | Endpoint         | Descripción               |
-| -------- | ---------------- | ------------------------- |
-| `POST`   | `/menu`          | Crear menú                |
-| `POST`   | `/menu/:id/copy` | Copiar menú a otra fecha  |
-| `PATCH`  | `/menu/:id`      | Actualizar menú           |
-| `DELETE` | `/menu/:id`      | Eliminar menú             |
-| `POST`   | `/dishes`        | Crear plato               |
-| `PATCH`  | `/dishes/:id`    | Actualizar plato          |
-| `DELETE` | `/dishes/:id`    | Eliminar plato            |
-| `POST`   | `/upload/image`  | Subir imagen a Cloudinary |
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `POST` | `/menu` | Crea un menú. |
+| `POST` | `/menu/:id/copy?fecha=YYYY-MM-DD` | Copia un menú a otra fecha. |
+| `PATCH` | `/menu/:id` | Actualiza un menú. |
+| `DELETE` | `/menu/:id` | Elimina un menú. |
+| `POST` | `/dishes` | Crea un plato. |
+| `PATCH` | `/dishes/:id` | Actualiza un plato. |
+| `DELETE` | `/dishes/:id` | Elimina un plato. |
+| `POST` | `/upload/image` | Sube una imagen a Cloudinary. |
 
-### Requiere JWT + rol `admin`
+### Requiere rol `admin`
 
-| Método  | Endpoint                     | Descripción                            |
-| ------- | ---------------------------- | -------------------------------------- |
-| `GET`   | `/orders`                    | Listar pedidos aprobados por admin (filtro: `?estado=...`) |
-| `GET`   | `/orders/by-date`            | Listar pedidos aprobados por admin en una fecha específica (`?date=YYYY-MM-DD`) |
-| `GET`   | `/orders/stream/admin`       | SSE — stream de pedidos (admin)        |
-| `PATCH` | `/orders/:id/cancel`         | Cancelar pedido                        |
-| `PATCH` | `/orders/:id/admin-validate` | Validar pedido como admin              |
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/orders?estado=...` | Lista todos los pedidos; permite filtrar por estado. |
+| `GET` | `/orders/stream/admin` | Stream SSE de pedidos nuevos para administración. |
+| `PATCH` | `/orders/:id/admin-validate` | Aprueba un pedido y lo envía a cocina. |
+| `PATCH` | `/orders/:id/cancel` | Cancela un pedido y restaura su stock. |
+| `GET` | `/statistics/summary` | Indicadores generales del periodo. |
+| `GET` | `/statistics/top-dishes` | Platos más vendidos. |
+| `GET` | `/statistics/peak-hours` | Horas con mayor cantidad de pedidos. |
+| `GET` | `/statistics/revenue` | Ingresos agrupados por día. |
+| `GET` | `/statistics/cancellations` | Estadísticas de cancelación. |
+| `POST` | `/dev-tools/clear-statistics-cache` | Limpia manualmente el caché de estadísticas. |
 
-### Requiere JWT + rol `admin` o `kitchen`
+Los endpoints de estadísticas aceptan `startDate` y `endDate`. `top-dishes` también acepta `limit`.
 
-| Método  | Endpoint                 | Descripción                      |
-| ------- | ------------------------ | -------------------------------- |
-| `GET`   | `/orders/stream/kitchen` | SSE — stream de pedidos (cocina) |
-| `PATCH` | `/orders/:id/status`     | Cambiar estado del pedido        |
+### Requiere rol `admin` o `kitchen`
 
-**Estados de pedido:** `pendiente` | `en_preparacion` | `entregado` | `cancelado`
+| Método | Endpoint | Descripción |
+| --- | --- | --- |
+| `GET` | `/orders/ByAdminTrue` | Lista pedidos aprobados por administración. |
+| `GET` | `/orders/stream/kitchen` | Stream SSE de pedidos aprobados y cambios de estado. |
+| `PATCH` | `/orders/:id/status` | Avanza un pedido a preparación o entrega. |
 
----
+Estados válidos en `/orders/:id/status`: `en_preparacion` y `entregado`. Las cancelaciones administrativas usan `/orders/:id/cancel` para restaurar el stock.
 
-## Filtrado y detalle de pedidos
+## Insomnia
 
-- Para obtener pedidos por estado: `/orders?estado=entregado` (o cualquier estado válido)
-- Para obtener pedidos por fecha: `/orders/by-date?date=YYYY-MM-DD`
-- Solo se listan pedidos aprobados por admin (`validadoPorAdmin: true`)
+1. Importa `insomnia-collection.json` en Insomnia.
+2. Para desarrollo utiliza el environment local.
+3. Para producción configura `base_url` con la URL pública del backend en Heroku.
+4. Ejecuta `POST /auth/login` y guarda el `access_token` en la variable `jwt_token`.
 
----
+Consulta `INSOMNIA_REQUESTS.md` para ver cuerpos y respuestas de ejemplo.
 
-## Probar con Insomnia
+## Deploy en Heroku
 
-1. Abre **Insomnia** → **Create** → **Import**
-2. Selecciona el archivo `insomnia-collection.json`
-3. Elige el environment: **Local** o **Production (Fly.io)**
-4. Ejecuta `POST /auth/login`, copia el `access_token` y pégalo en la variable `jwt_token` del environment
+El backend se ejecuta en Heroku. El frontend permanece como sitio estático en Cloudflare Pages y consume la URL pública de esta API mediante `VITE_API_BASE_URL`.
 
-Ver `INSOMNIA_REQUESTS.md` para ejemplos detallados de cada request.
-
----
-
-## Deploy en Fly.io
-
-El proyecto incluye `Dockerfile` (multi-stage) y `fly.toml` listos para deploy.
-
-```bash
-# 1. Instalar flyctl
-brew install flyctl
-
-# 2. Login
-fly auth login
-
-# 3. Crear la app (solo la primera vez)
-fly launch --name delivery-lunch-back --region gru --no-deploy
-
-# 4. Configurar variables de entorno secretas
-fly secrets set MONGODB_URI="mongodb+srv://..." \
-  MONGODB_DB_NAME="delivery_lunch" \
-  JWT_SECRET="..." \
-  JWT_EXPIRES_IN="7d" \
-  ADMIN_USERNAME="admin" \
-  ADMIN_PASSWORD_HASH='$2b$10$...' \
-  CLOUDINARY_CLOUD_NAME="..." \
-  CLOUDINARY_API_KEY="..." \
-  CLOUDINARY_API_SECRET="..." \
-  WHATSAPP_NOTIFY_PHONE="..." \
-  CALLMEBOT_API_KEY="..."
-
-# 5. Deploy
-fly deploy
+```text
+delivery-lunch-front (Cloudflare Pages estático)
+                         │
+                         ▼
+             delivery-lunch-back (Heroku)
+                  ├── MongoDB Atlas
+                  ├── Cloudinary
+                  └── CallMeBot
 ```
 
-La app quedará disponible en `https://delivery-lunch-back.fly.dev`.
+### Configuración de la aplicación
 
-Para deploys posteriores solo se necesita:
+Define las variables de entorno desde **Heroku Dashboard → Settings → Config Vars** utilizando los mismos nombres descritos en la sección de configuración local. Heroku entrega `PORT` automáticamente; la aplicación ya lo lee desde `process.env.PORT`.
 
-```bash
-fly deploy
+No guardes secretos reales en Git, `.env.example`, scripts de despliegue ni documentación.
+
+### Build y arranque
+
+Heroku detecta el proyecto mediante `package.json` y ejecuta su script `build`. Para producción, el proceso web debe iniciar el resultado compilado:
+
+```text
+web: npm run start:prod
 ```
 
----
+El repositorio todavía no contiene un `Procfile` y su script `start` ejecuta Nest CLI. Antes de cambiar o recrear el despliegue, se recomienda agregar el `Procfile` anterior o cambiar `start` a `node dist/main`.
 
-## Tests
+También se recomienda declarar Node.js 22 en `package.json`:
+
+```json
+{
+  "engines": {
+    "node": "22.x"
+  }
+}
+```
+
+Estas recomendaciones describen cambios pendientes; este README no ejecuta ni modifica la aplicación activa de Heroku.
+
+### Consideración para SSE
+
+`OrdersSseService` mantiene sus eventos en memoria. Debe conservarse una sola instancia web mientras se use este diseño. Escalar a más instancias podría separar los eventos de administración y cocina; antes de hacerlo debe implementarse un bus compartido.
+
+> No crear aplicaciones, agregar add-ons, escalar dynos ni cambiar planes con costo sin autorización explícita del propietario.
+
+Documentación oficial: [despliegue de Node.js en Heroku](https://devcenter.heroku.com/articles/deploying-nodejs), [config vars](https://devcenter.heroku.com/articles/config-vars) y [Procfile](https://devcenter.heroku.com/articles/procfile).
+
+## Tests y calidad
 
 ```bash
 # Unit tests
@@ -179,20 +205,27 @@ npm run test:cov
 
 # E2E
 npm run test:e2e
+
+# Lint con autofix
+npm run lint
+
+# Formato
+npm run format
 ```
 
----
+## Estructura principal
 
-## Estructura del proyecto
-
-```
+```text
 src/
-├── auth/          # Login JWT + guards + estrategia Passport
-├── dishes/        # CRUD de platos
-├── menu/          # CRUD de menús + copia de menú
-├── orders/        # Pedidos + SSE + notificaciones WhatsApp
-├── upload/        # Subida de imágenes a Cloudinary
-├── common/        # Filtros, interceptores, utilidades
-├── config/        # Configuración de app, base de datos y constantes
-└── database/      # Seeds
+├── auth/          # Login, JWT, guards y roles
+├── common/        # Filtros, interceptores y utilidades
+├── config/        # Configuración de aplicación y base de datos
+├── database/      # Seeds
+├── dishes/        # Platos y stock
+├── menu/          # Menús diarios
+├── orders/        # Pedidos, estados, SSE y WhatsApp
+├── statistics/    # Dashboard y agregaciones
+├── upload/        # Imágenes en Cloudinary
+├── app.module.ts
+└── main.ts
 ```

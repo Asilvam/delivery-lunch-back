@@ -17,7 +17,7 @@ interface SeedMenu {
 
 export const menuSeed: SeedMenu[] = [
   {
-    fecha: '2026-04-14',
+    fecha: '2026-08-24',
     ensalada: ['Ensalada surtida', 'Ensalada chilena', 'Repollo con zanahoria'],
     pan: 'Pan Fresco del dia',
     postre: ['Flan de vainilla', 'Jalea light'],
