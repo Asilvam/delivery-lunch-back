@@ -55,6 +55,21 @@ export class StatisticsService {
     private readonly orderModel: Model<OrderDocument>,
   ) {}
 
+  async getCompletedOrders(startDate: string, endDate: string) {
+    const range = statisticsDateRange(startDate, endDate);
+    return this.orderModel
+      .find({
+        createdAt: range.createdAt,
+        estado: { $in: [OrderStatus.ENTREGADO, OrderStatus.CANCELADO] },
+      })
+      .select(
+        'menuId fecha cliente telefono total estado items validadoPorAdmin createdAt updatedAt aceptadoEn entregadoEn canceladoEn',
+      )
+      .sort({ createdAt: -1, _id: -1 })
+      .lean()
+      .exec();
+  }
+
   async getDashboardSummary(
     startDate: string,
     endDate: string,

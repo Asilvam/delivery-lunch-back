@@ -17,6 +17,18 @@ export class StatisticsController {
 
   constructor(private readonly statisticsService: StatisticsService) {}
 
+  @Get('completed-orders')
+  getCompletedOrders(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const range = statisticsDateRange(startDate, endDate);
+    return this.statisticsService.getCompletedOrders(
+      range.startDate,
+      range.endDate,
+    );
+  }
+
   @Get('summary')
   async getDashboardSummary(
     @Query('startDate') startDate: string,
