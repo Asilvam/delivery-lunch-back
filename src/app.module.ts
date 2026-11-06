@@ -8,6 +8,7 @@ import { DishesModule } from './dishes/dishes.module';
 import { MenuModule } from './menu/menu.module';
 import { OrdersModule } from './orders/orders.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { DishLibraryModule } from './dish-library/dish-library.module';
 import { UploadModule } from './upload/upload.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { UploadModule } from './upload/upload.module';
     OrdersModule,
     StatisticsModule,
     UploadModule,
+    DishLibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, ClientSession } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Model, ClientSession, Connection, Types } from 'mongoose';
 import { MENU_PRICE } from '../constants/menu.constants';
 import { DishesRepository } from '../../dishes/repositories/dishes.repository';
 import { CreateMenuDto } from '../dto/create-menu.dto';
@@ -13,6 +13,7 @@ export class MenuRepository {
   private readonly logger = new Logger(MenuRepository.name);
 
   constructor(
+    @InjectConnection() private readonly connection: Connection,
     @InjectModel(Menu.name)
     private readonly menuModel: Model<MenuDocument>,
     private readonly dishesRepository: DishesRepository,
@@ -24,25 +25,40 @@ export class MenuRepository {
   }
 
   async findAll(): Promise<Menu[]> {
-    return this.menuModel.find().lean<Menu[]>();
+    return this.menuModel.find({ estado: { $ne: 'borrador' } }).lean<Menu[]>();
   }
 
   async findById(id: string, session?: ClientSession): Promise<Menu | null> {
-    return this.menuModel.findById(id).session(session ?? null).lean<Menu>();
+    return this.menuModel
+      .findById(id)
+      .session(session ?? null)
+      .lean<Menu>();
   }
 
-  async findByDate(fecha: string): Promise<MenuWithDishes | null> {
+  async findByDate(
+    fecha: string,
+    includeDraft = false,
+  ): Promise<MenuWithDishes | null> {
     this.logger.log(`Buscando menu por fecha: ${fecha}`);
 
-    const menu = await this.menuModel.findOne({ fecha }).lean<Menu>();
+    const menu = await this.menuModel
+      .findOne({
+        fecha,
+        ...(!includeDraft ? { estado: { $ne: 'borrador' } } : {}),
+      })
+      .lean<Menu & { _id: Types.ObjectId }>();
 
     if (!menu) return null;
 
     const platos = await this.dishesRepository.findByMenuId(
-      (menu as any)._id.toString(),
+      menu._id.toString(),
     );
 
-    return { ...(menu as any), precioBase: menu.precioBase ?? MENU_PRICE, platos };
+    return {
+      ...menu,
+      precioBase: menu.precioBase ?? MENU_PRICE,
+      platos,
+    };
   }
 
   async update(id: string, updateMenuDto: UpdateMenuDto): Promise<Menu | null> {
@@ -66,14 +82,18 @@ export class MenuRepository {
 
     if (!origin) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id, ...rest } = origin as any;
-
-    const newMenu = new this.menuModel({ ...rest, fecha });
-    const saved = await newMenu.save();
-
-    await this.dishesRepository.copyToMenu(id, saved._id.toString());
-
-    return this.findByDate(fecha);
+    await this.connection.transaction(async (session) => {
+      const newMenu = new this.menuModel({
+        fecha,
+        precioBase: origin.precioBase ?? MENU_PRICE,
+        ensalada: origin.ensalada,
+        pan: origin.pan,
+        postre: origin.postre,
+        estado: 'borrador',
+      });
+      const saved = await newMenu.save({ session });
+      await this.dishesRepository.copyToMenu(id, saved._id.toString(), session);
+    });
+    return this.findByDate(fecha, true);
   }
 }

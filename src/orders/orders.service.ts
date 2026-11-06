@@ -72,7 +72,7 @@ export class OrdersService {
         );
         if (existing) return { order: checkExisting(existing), created: false };
         const menu = await this.menuRepository.findById(dto.menuId, session);
-        if (!menu || menu.fecha !== dto.fecha)
+        if (!menu || menu.estado === 'borrador' || menu.fecha !== dto.fecha)
           throw new BadRequestException(
             'El menú ya no está disponible para esa fecha',
           );

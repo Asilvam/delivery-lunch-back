@@ -1,3 +1,5 @@
+import { DishLibraryModule } from '../dish-library/dish-library.module';
+import { MenuCompositionService } from './menu-composition.service';
 import { MenuPricingService } from './menu-pricing.service';
 import { Dish, DishSchema } from '../dishes/schemas/dish.schema';
 import { Module } from '@nestjs/common';
@@ -16,10 +18,16 @@ import { Menu, MenuSchema } from './schemas/menu.schema';
       { name: Dish.name, schema: DishSchema },
     ]),
     DishesModule,
+    DishLibraryModule,
     AuthModule,
   ],
   controllers: [MenuController],
-  providers: [MenuService, MenuRepository, MenuPricingService],
+  providers: [
+    MenuService,
+    MenuRepository,
+    MenuPricingService,
+    MenuCompositionService,
+  ],
   exports: [MenuService, MenuRepository],
 })
 export class MenuModule {}

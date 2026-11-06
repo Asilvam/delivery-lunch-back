@@ -15,6 +15,8 @@ import {
 import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { MenuCompositionService } from './menu-composition.service';
+import { MenuCompositionDto } from './dto/menu-composition.dto';
 import { MenuPricingService } from './menu-pricing.service';
 import { UpdateMenuPricesDto } from './dto/update-menu-prices.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -39,6 +41,7 @@ export class MenuController {
   constructor(
     private readonly menuService: MenuService,
     private readonly pricing: MenuPricingService,
+    private readonly composition: MenuCompositionService,
   ) {}
 
   @Patch(':id/prices')
@@ -54,6 +57,30 @@ export class MenuController {
   @Get()
   async findAll() {
     return this.menuService.findAll();
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  listAdmin(@Query('fecha') fecha?: string) {
+    return this.composition.list(fecha);
+  }
+
+  @Post('composition')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  createComposition(@Body() input: MenuCompositionDto) {
+    return this.composition.save(input);
+  }
+
+  @Patch(':id/composition')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  updateComposition(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Body() input: MenuCompositionDto,
+  ) {
+    return this.composition.save(input, id);
   }
 
   @Get('today')
@@ -87,7 +114,7 @@ export class MenuController {
   @Roles('admin')
   @Post(':id/copy')
   async copy(
-    @Param('id') id: string,
+    @Param('id', ParseMongoIdPipe) id: string,
     @Query('fecha') fecha: string,
   ): Promise<MenuWithDishes[]> {
     if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {

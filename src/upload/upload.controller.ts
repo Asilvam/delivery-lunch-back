@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from './upload.service';
 
@@ -18,7 +20,8 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post('image')
   @ApiBearerAuth()
   @ApiBody({
@@ -33,7 +36,9 @@ export class UploadController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file', { storage: undefined }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     return this.uploadService.uploadImage(file);
   }

@@ -22,10 +22,12 @@ export class DishesRepository {
     return dish.save();
   }
 
-  async findByMenuId(menuId: string): Promise<Dish[]> {
+  async findByMenuId(menuId: string, session?: ClientSession): Promise<Dish[]> {
     this.logger.log(`Buscando platos para menuId: ${menuId}`);
     const dishes = await this.dishModel
       .find({ menuId: new Types.ObjectId(menuId) })
+      .session(session ?? null)
+      .sort({ orden: 1, _id: 1 })
       .lean<Dish[]>();
     return dishes;
   }
@@ -85,12 +87,28 @@ export class DishesRepository {
     await this.dishModel.deleteMany({ menuId: new Types.ObjectId(menuId) });
   }
 
-  async copyToMenu(fromMenuId: string, toMenuId: string): Promise<void> {
-    const dishes = await this.findByMenuId(fromMenuId);
-    const copies = dishes.map(({ ...rest }) => ({
-      ...rest,
+  async copyToMenu(
+    fromMenuId: string,
+    toMenuId: string,
+    session?: ClientSession,
+  ): Promise<void> {
+    const dishes = await this.findByMenuId(fromMenuId, session);
+    const copies = dishes.map((dish) => ({
       menuId: new Types.ObjectId(toMenuId),
+      catalogoId: dish.catalogoId,
+      nombre: dish.nombre,
+      descripcion: dish.descripcion,
+      categoria: dish.categoria,
+      imagen_url: dish.imagen_url,
+      imagenPublicId: dish.imagenPublicId,
+      precio: dish.precio,
+      precioEspecial: dish.precioEspecial,
+      es_hipo: dish.es_hipo,
+      opciones: dish.opciones,
+      orden: dish.orden,
+      stock: 0,
+      stockInicial: 0,
     }));
-    await this.dishModel.insertMany(copies);
+    if (copies.length) await this.dishModel.insertMany(copies, { session });
   }
 }

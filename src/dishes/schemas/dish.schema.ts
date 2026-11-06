@@ -6,6 +6,15 @@ export type DishDocument = HydratedDocument<Dish>;
 
 @Schema({ collection: DISHES_COLLECTION, timestamps: true })
 export class Dish {
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'LibraryDish' })
+  catalogoId?: Types.ObjectId;
+  @Prop({ default: '' }) descripcion?: string;
+  @Prop({ default: '' }) categoria?: string;
+  @Prop() imagenPublicId?: string;
+  @Prop({ type: Number, default: null }) precioEspecial?: number | null;
+  @Prop({ min: 0 }) stockInicial?: number;
+  @Prop({ default: 0 }) orden?: number;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Menu', required: true })
   menuId: Types.ObjectId;
 

@@ -6,6 +6,12 @@ export type MenuDocument = HydratedDocument<Menu>;
 
 @Schema({ collection: MENU_COLLECTION, timestamps: true })
 export class Menu {
+  @Prop({ type: String, enum: ['borrador', 'publicado'], default: 'publicado' })
+  estado: 'borrador' | 'publicado';
+
+  createdAt: Date;
+  updatedAt: Date;
+
   @Prop({ type: Number, default: MENU_PRICE, min: 1 })
   precioBase: number;
 

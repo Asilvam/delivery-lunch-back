@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { DateTime } from 'luxon';
 import { toIsoDate } from '../common/utils/date.utils';
 import { Menu } from './schemas/menu.schema';
 import { MenuWithDishes } from './types/menu-with-dishes.type';
@@ -16,7 +23,7 @@ export class MenuService {
     this.logger.log(`Creando menu para fecha: ${createMenuDto.fecha}`);
     const menu = await this.menuRepository.create(createMenuDto);
     this.logger.log(
-      `Menu creado — id: ${(menu as any)._id}, fecha: ${createMenuDto.fecha}`,
+      `Menu creado — id: ${menu._id.toString()}, fecha: ${createMenuDto.fecha}`,
     );
     return menu;
   }
@@ -77,7 +84,21 @@ export class MenuService {
       throw new NotFoundException(`No existe menu con id ${id}`);
     }
 
-    const copied = await this.menuRepository.copy(id, fecha);
+    if (!DateTime.fromISO(fecha).isValid)
+      throw new BadRequestException('La fecha no es válida.');
+    let copied: MenuWithDishes | null;
+    try {
+      copied = await this.menuRepository.copy(id, fecha);
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 11000
+      )
+        throw new ConflictException('Ya existe un menú para esa fecha.');
+      throw error;
+    }
 
     if (!copied) {
       this.logger.error(`Error al copiar menu — id: ${id} a fecha: ${fecha}`);

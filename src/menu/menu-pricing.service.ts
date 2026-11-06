@@ -60,7 +60,13 @@ export class MenuPricingService {
               _id: new Types.ObjectId(dish.id),
               menuId: new Types.ObjectId(id),
             },
-            update: { $set: { precio: dish.precio } },
+            update: {
+              $set: {
+                precio: dish.precio,
+                precioEspecial:
+                  dish.precio === dto.precioBase ? null : dish.precio,
+              },
+            },
           },
         })),
         { session },
