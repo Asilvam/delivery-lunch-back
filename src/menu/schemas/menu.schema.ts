@@ -1,11 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
-import { MENU_COLLECTION } from '../constants/menu.constants';
+import { MENU_PRICE, MENU_COLLECTION } from '../constants/menu.constants';
 
 export type MenuDocument = HydratedDocument<Menu>;
 
 @Schema({ collection: MENU_COLLECTION, timestamps: true })
 export class Menu {
+  @Prop({ type: Number, default: MENU_PRICE, min: 1 })
+  precioBase: number;
+
   @Prop({ required: true, unique: true })
   fecha: string;
 

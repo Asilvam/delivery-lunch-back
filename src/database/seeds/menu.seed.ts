@@ -17,10 +17,10 @@ interface SeedMenu {
 
 export const menuSeed: SeedMenu[] = [
   {
-    fecha: '2026-04-14',
-    ensalada: ['Ensalada surtida', 'Ensalada chilena', 'Repollo con zanahoria'],
-    pan: 'Pan Fresco del dia',
-    postre: ['Flan de vainilla', 'Jalea light'],
+    fecha: '2026-11-05',
+    ensalada: ['Ensalada surtida'],
+    pan: 'Pan fresco del día',
+    postre: ['Flan', 'Macedonia', 'Fruta'],
     platos: [
       {
         nombre: 'Pollo asado con arroz y papas fritas',

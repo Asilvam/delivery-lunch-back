@@ -7,7 +7,7 @@ Importa el archivo `insomnia-collection.json` en Insomnia para tener todos los r
 1. Abre **Insomnia**
 2. Click en **"Create"** → **"Import"**
 3. Selecciona `insomnia-collection.json`
-4. Elige el environment: **Local** o **Production (Fly.io)**
+4. Elige el environment: **Local** o **Production (Heroku)**
 5. Tras hacer login, copia el token y pégalo en la variable `jwt_token` del environment activo
 
 ---
@@ -17,9 +17,11 @@ Importa el archivo `insomnia-collection.json` en Insomnia para tener todos los r
 | Environment         | `base_url`                            | `jwt_token`         |
 | ------------------- | ------------------------------------- | ------------------- |
 | Local               | `http://localhost:3500`               | (llenar tras login) |
-| Production (Fly.io) | `https://delivery-lunch-back.fly.dev` | (llenar tras login) |
+| Production (Heroku) | `https://your-backend-app.herokuapp.com` | (llenar tras login) |
 
 ---
+
+Reemplaza la URL de producción de ejemplo por la URL real obtenida con `heroku info`.
 
 ## Auth
 

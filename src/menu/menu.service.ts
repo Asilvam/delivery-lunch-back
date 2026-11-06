@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { toIsoDate } from '../common/utils/date.utils';
+import { Menu } from './schemas/menu.schema';
+import { MenuWithDishes } from './types/menu-with-dishes.type';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
 import { MenuRepository } from './repositories/menu.repository';
-import { Menu } from './schemas/menu.schema';
-import { MenuWithDishes } from './types/menu-with-dishes.type';
 
 @Injectable()
 export class MenuService {
@@ -62,6 +62,10 @@ export class MenuService {
 
     this.logger.log(`Menu eliminado — id: ${id}`);
     return menu;
+  }
+
+  async findAll() {
+    return this.menuRepository.findAll();
   }
 
   async copy(id: string, fecha: string): Promise<MenuWithDishes[]> {

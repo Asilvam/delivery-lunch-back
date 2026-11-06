@@ -20,7 +20,7 @@ export class OrdersSseService implements OnModuleDestroy {
   /** Emite un evento al canal de administración */
   emitToAdmin(
     order: OrderDocument,
-    eventType: 'new_order' | 'order_cancelled',
+    eventType: 'new_order' | 'order_cancelled' | 'order_validated',
   ): void {
     this.logger.log(
       `SSE→admin [${eventType}] — pedido: ${order._id}, cliente: "${order.cliente}"`,

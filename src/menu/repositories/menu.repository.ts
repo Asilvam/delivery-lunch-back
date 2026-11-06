@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, ClientSession } from 'mongoose';
+import { MENU_PRICE } from '../constants/menu.constants';
 import { DishesRepository } from '../../dishes/repositories/dishes.repository';
 import { CreateMenuDto } from '../dto/create-menu.dto';
 import { UpdateMenuDto } from '../dto/update-menu.dto';
@@ -22,8 +23,12 @@ export class MenuRepository {
     return menu.save();
   }
 
-  async findById(id: string): Promise<Menu | null> {
-    return this.menuModel.findById(id).lean<Menu>();
+  async findAll(): Promise<Menu[]> {
+    return this.menuModel.find().lean<Menu[]>();
+  }
+
+  async findById(id: string, session?: ClientSession): Promise<Menu | null> {
+    return this.menuModel.findById(id).session(session ?? null).lean<Menu>();
   }
 
   async findByDate(fecha: string): Promise<MenuWithDishes | null> {
@@ -37,7 +42,7 @@ export class MenuRepository {
       (menu as any)._id.toString(),
     );
 
-    return { ...(menu as any), platos };
+    return { ...(menu as any), precioBase: menu.precioBase ?? MENU_PRICE, platos };
   }
 
   async update(id: string, updateMenuDto: UpdateMenuDto): Promise<Menu | null> {

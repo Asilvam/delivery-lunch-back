@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types, Schema as MongooseSchema } from 'mongoose';
 import { DISHES_COLLECTION } from '../constants/dishes.constants';
 
 export type DishDocument = HydratedDocument<Dish>;
 
 @Schema({ collection: DISHES_COLLECTION, timestamps: true })
 export class Dish {
-  @Prop({ type: Types.ObjectId, ref: 'Menu', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Menu', required: true })
   menuId: Types.ObjectId;
 
   @Prop({ required: true })

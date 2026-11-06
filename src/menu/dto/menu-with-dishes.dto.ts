@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class MenuWithDishesDto {
+  @ApiProperty({ example: 5500 })
+  precioBase: number;
+
   @ApiProperty({ example: '644d6fd1b63d95c0f80de42c' })
   _id: string;
 

@@ -1,8 +1,14 @@
+import { IsInt, Min, IsOptional } from 'class-validator';
 import { IsArray, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMenuDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  precioBase?: number;
+
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {

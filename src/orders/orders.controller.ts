@@ -1,4 +1,7 @@
 import {
+  BadRequestException,
+  Headers,
+  Req,
   Body,
   Controller,
   Get,
@@ -12,7 +15,8 @@ import {
   Sse,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
+import { isUUID } from 'class-validator';
 import { Observable, concat, map } from 'rxjs';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -44,12 +48,24 @@ export class OrdersController {
    * notifica WhatsApp al admin y emite evento SSE al canal admin.
    */
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('customer')
   @ApiBody({ type: CreateOrderDto })
-  async create(@Body() createOrderDto: CreateOrderDto) {
+  async create(
+    @Body() createOrderDto: CreateOrderDto,
+    @Headers('idempotency-key') requestId: string,
+    @Req() req: Request & { user: { username: string; email: string } },
+  ) {
+    if (!requestId || !isUUID(requestId, '4'))
+      throw new BadRequestException('Idempotency-Key debe ser un UUID v4');
     this.logger.log(
       `POST /orders — cliente: "${createOrderDto.cliente}", items: ${createOrderDto.items.length}`,
     );
-    return this.ordersService.create(createOrderDto);
+    return this.ordersService.create(
+      createOrderDto,
+      { googleId: req.user.username, email: req.user.email },
+      requestId,
+    );
   }
 
   /**
@@ -59,7 +75,7 @@ export class OrdersController {
    */
   @Get('ByAdminTrue')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'kitchen')
   async findAllByAdminTrue() {
     this.logger.log(`GET /orders`);
     return this.ordersService.findAllByAdminTrue();
@@ -114,12 +130,10 @@ export class OrdersController {
     );
 
     const live$ = this.ordersSseService.getAdminStream().pipe(
-      map(
-        (event: SseOrderEvent): MessageEvent => ({
-          type: event.type,
-          data: event.data,
-        }),
-      ),
+      map((event: SseOrderEvent): MessageEvent => ({
+        type: event.type,
+        data: event.data,
+      })),
     );
 
     return concat(replayFlat$, live$);
@@ -161,12 +175,10 @@ export class OrdersController {
     );
 
     const live$ = this.ordersSseService.getKitchenStream().pipe(
-      map(
-        (event: SseOrderEvent): MessageEvent => ({
-          type: event.type,
-          data: event.data,
-        }),
-      ),
+      map((event: SseOrderEvent): MessageEvent => ({
+        type: event.type,
+        data: event.data,
+      })),
     );
 
     return concat(replayFlat$, live$);

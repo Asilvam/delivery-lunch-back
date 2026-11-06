@@ -1,3 +1,5 @@
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   Body,
   Controller,
@@ -21,6 +23,8 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('dishes')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
 @Controller('dishes')
 export class DishesController {
   constructor(private readonly dishesService: DishesService) {}

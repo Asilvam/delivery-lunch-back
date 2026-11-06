@@ -1,5 +1,5 @@
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
-FROM node:22-alpine AS build
+FROM node:24.22.2-alpine AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # ─── Stage 2: Production ──────────────────────────────────────────────────────
-FROM node:22-alpine AS production
+FROM node:24.22.2-alpine AS production
 
 WORKDIR /app
 
@@ -33,7 +33,7 @@ COPY --from=build /app/dist ./dist
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
-# Fly.io inyecta PORT como variable de entorno; el app ya lo lee con process.env.PORT
+# Puerto local por defecto; en la nube se utiliza la variable PORT.
 EXPOSE 3500
 
 CMD ["node", "dist/main"]

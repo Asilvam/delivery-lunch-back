@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, ClientSession } from 'mongoose';
 import { DateTime } from 'luxon';
 import { OrderStatus } from '../constants/order.constants';
 import { CreateOrderDto } from '../dto/create-order.dto';
@@ -15,12 +15,22 @@ export class OrdersRepository {
     private readonly orderModel: Model<OrderDocument>,
   ) {}
 
-  async create(createOrderDto: CreateOrderDto): Promise<OrderDocument> {
+  async create(
+    createOrderDto: CreateOrderDto,
+    metadata: {
+      customerGoogleId: string;
+      customerEmail: string;
+      requestId: string;
+      requestFingerprint: string;
+    },
+    session: ClientSession,
+  ): Promise<OrderDocument> {
     this.logger.log(
       `Insertando pedido para cliente: "${createOrderDto.cliente}"`,
     );
     const order = new this.orderModel({
       ...createOrderDto,
+      ...metadata,
       menuId: new Types.ObjectId(createOrderDto.menuId),
       items: createOrderDto.items.map((item) => ({
         ...item,
@@ -28,12 +38,33 @@ export class OrdersRepository {
         selecciones: item.selecciones ?? {},
       })),
     });
-    return order.save();
+    return order.save({ session });
   }
 
-  async findById(id: string): Promise<OrderDocument | null> {
+  async ensureIndexes(): Promise<void> {
+    await this.orderModel.init();
+  }
+
+  async findByRequest(
+    customerGoogleId: string,
+    requestId: string,
+    session?: ClientSession,
+  ): Promise<OrderDocument | null> {
+    return this.orderModel
+      .findOne({ customerGoogleId, requestId })
+      .session(session ?? null)
+      .exec();
+  }
+
+  async findById(
+    id: string,
+    session?: ClientSession,
+  ): Promise<OrderDocument | null> {
     this.logger.log(`Buscando pedido por id: ${id}`);
-    return this.orderModel.findById(id).exec();
+    return this.orderModel
+      .findById(id)
+      .session(session ?? null)
+      .exec();
   }
 
   async findAllByAdminTrue(): Promise<OrderDocument[]> {
@@ -97,11 +128,44 @@ export class OrdersRepository {
   }
 
   async validateByAdmin(id: string): Promise<OrderDocument | null> {
-    this.logger.log(`Validando pedido por admin — id: ${id}`);
     return this.orderModel
-      .findByIdAndUpdate(
-        id,
+      .findOneAndUpdate(
+        { _id: id, estado: OrderStatus.PENDIENTE, validadoPorAdmin: false },
         { $set: { validadoPorAdmin: true } },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async cancelActive(
+    id: string,
+    session: ClientSession,
+  ): Promise<OrderDocument | null> {
+    return this.orderModel
+      .findOneAndUpdate(
+        {
+          _id: id,
+          estado: { $in: [OrderStatus.PENDIENTE, OrderStatus.EN_PREPARACION] },
+        },
+        { $set: { estado: OrderStatus.CANCELADO, canceladoEn: new Date() } },
+        { new: true, session },
+      )
+      .exec();
+  }
+
+  async advanceStatus(
+    id: string,
+    previous: OrderStatus,
+    next: OrderStatus,
+  ): Promise<OrderDocument | null> {
+    const timestamps =
+      next === OrderStatus.EN_PREPARACION
+        ? { aceptadoEn: new Date() }
+        : { entregadoEn: new Date() };
+    return this.orderModel
+      .findOneAndUpdate(
+        { _id: id, estado: previous, validadoPorAdmin: true },
+        { $set: { estado: next, ...timestamps } },
         { new: true },
       )
       .exec();

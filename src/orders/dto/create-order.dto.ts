@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMinSize,
+  IsInt,
   IsDateString,
   IsMongoId,
   IsNotEmpty,
@@ -22,10 +24,13 @@ export class OrderItemDto {
 
   @IsString()
   @IsNotEmpty()
-  @ApiProperty({ example: 'Pollo asado', description: 'Nombre del plato ordenado' })
+  @ApiProperty({
+    example: 'Pollo asado',
+    description: 'Nombre del plato ordenado',
+  })
   nombre: string;
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
   @ApiProperty({ example: 1, description: 'Cantidad ordenada de este ítem' })
   cantidad: number;
@@ -37,7 +42,11 @@ export class OrderItemDto {
 
   @IsObject()
   @IsOptional()
-  @ApiProperty({ example: { acompanamiento: 'arroz' }, description: 'Selección de opciones, si aplica', required: false })
+  @ApiProperty({
+    example: { acompanamiento: 'arroz' },
+    description: 'Selección de opciones, si aplica',
+    required: false,
+  })
   selecciones?: Record<string, string>;
 }
 
@@ -48,7 +57,10 @@ export class CreateOrderDto {
   menuId: string;
 
   @IsDateString()
-  @ApiProperty({ example: '2026-12-30', description: 'Fecha de la orden, formato YYYY-MM-DD' })
+  @ApiProperty({
+    example: '2026-12-30',
+    description: 'Fecha de la orden, formato YYYY-MM-DD',
+  })
   fecha: string;
 
   @IsString()
@@ -67,6 +79,7 @@ export class CreateOrderDto {
   total: number;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   @ApiProperty({ type: [OrderItemDto], description: 'Items de la orden' })

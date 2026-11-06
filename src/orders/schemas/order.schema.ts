@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types, Schema as MongooseSchema } from 'mongoose';
 import { ORDERS_COLLECTION, OrderStatus } from '../constants/order.constants';
 
 export type OrderDocument = HydratedDocument<Order>;
 
 @Schema({ _id: false })
 export class OrderItem {
-  @Prop({ type: Types.ObjectId, ref: 'Dish', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Dish', required: true })
   platoId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -26,7 +26,12 @@ export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 
 @Schema({ collection: ORDERS_COLLECTION, timestamps: true })
 export class Order {
-  @Prop({ type: Types.ObjectId, ref: 'Menu', required: true })
+  @Prop() customerGoogleId?: string;
+  @Prop() customerEmail?: string;
+  @Prop() requestId?: string;
+  @Prop() requestFingerprint?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Menu', required: true })
   menuId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -69,3 +74,14 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ estado: 1, createdAt: -1 });
 OrderSchema.index({ 'items.platoId': 1 });
+
+OrderSchema.index(
+  { customerGoogleId: 1, requestId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      customerGoogleId: { $type: 'string' },
+      requestId: { $type: 'string' },
+    },
+  },
+);

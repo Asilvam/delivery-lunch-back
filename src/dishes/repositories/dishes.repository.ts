@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, ClientSession } from 'mongoose';
 import { CreateDishDto } from '../dto/create-dish.dto';
 import { UpdateDishDto } from '../dto/update-dish.dto';
 import { Dish, DishDocument } from '../schemas/dish.schema';
@@ -24,9 +24,10 @@ export class DishesRepository {
 
   async findByMenuId(menuId: string): Promise<Dish[]> {
     this.logger.log(`Buscando platos para menuId: ${menuId}`);
-    return this.dishModel
+    const dishes = await this.dishModel
       .find({ menuId: new Types.ObjectId(menuId) })
       .lean<Dish[]>();
+    return dishes;
   }
 
   async findById(id: string): Promise<Dish | null> {
@@ -37,6 +38,37 @@ export class DishesRepository {
     return this.dishModel
       .findByIdAndUpdate(id, { $set: updateDishDto }, { new: true })
       .lean<Dish>();
+  }
+
+  async reserveStock(
+    id: string,
+    menuId: string,
+    quantity: number,
+    session: ClientSession,
+  ): Promise<Dish | null> {
+    return this.dishModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(id),
+          menuId: new Types.ObjectId(menuId),
+          stock: { $gte: quantity },
+        },
+        { $inc: { stock: -quantity } },
+        { new: true, session },
+      )
+      .lean<Dish>();
+  }
+
+  async restoreStock(
+    id: string,
+    quantity: number,
+    session: ClientSession,
+  ): Promise<void> {
+    await this.dishModel.updateOne(
+      { _id: id },
+      { $inc: { stock: quantity } },
+      { session },
+    );
   }
 
   async updateStock(id: string, stock: number): Promise<Dish | null> {

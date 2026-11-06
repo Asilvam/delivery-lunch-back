@@ -27,9 +27,9 @@
       "_id": "env_production",
       "_type": "environment",
       "parentId": "wrk_delivery_lunch",
-      "name": "Production (Fly.io)",
+      "name": "Production (Heroku)",
       "data": {
-        "base_url": "https://delivery-lunch-back.fly.dev",
+        "base_url": "https://your-backend-app.herokuapp.com",
         "jwt_token": ""
       }
     },

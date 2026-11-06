@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 
-export type UserRole = 'admin' | 'kitchen';
+export type UserRole = 'admin' | 'kitchen' | 'customer';
 
 interface UserConfig {
   username: string;

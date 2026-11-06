@@ -1,3 +1,5 @@
+import { MenuPricingService } from './menu-pricing.service';
+import { Dish, DishSchema } from '../dishes/schemas/dish.schema';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
@@ -9,12 +11,15 @@ import { Menu, MenuSchema } from './schemas/menu.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Menu.name, schema: MenuSchema }]),
+    MongooseModule.forFeature([
+      { name: Menu.name, schema: MenuSchema },
+      { name: Dish.name, schema: DishSchema },
+    ]),
     DishesModule,
     AuthModule,
   ],
   controllers: [MenuController],
-  providers: [MenuService, MenuRepository],
+  providers: [MenuService, MenuRepository, MenuPricingService],
   exports: [MenuService, MenuRepository],
 })
 export class MenuModule {}

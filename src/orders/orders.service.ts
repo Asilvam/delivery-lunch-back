@@ -1,11 +1,14 @@
+import { MENU_SALAD, MENU_DESSERT } from '../menu/constants/menu.constants';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DateTime } from 'luxon';
-import { Types } from 'mongoose';
+import { Connection } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
+import { createHash } from 'node:crypto';
 import { DishesRepository } from '../dishes/repositories/dishes.repository';
 import { MenuRepository } from '../menu/repositories/menu.repository';
 import { OrderStatus } from './constants/order.constants';
@@ -16,13 +19,12 @@ import { OrderDocument } from './schemas/order.schema';
 import { OrdersSseService } from './services/orders-sse.service';
 import { WhatsappService } from './services/whatsapp.service';
 
-const SANTIAGO_TZ = 'America/Santiago';
-
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
   constructor(
+    @InjectConnection() private readonly connection: Connection,
     private readonly ordersRepository: OrdersRepository,
     private readonly menuRepository: MenuRepository,
     private readonly dishesRepository: DishesRepository,
@@ -30,81 +32,145 @@ export class OrdersService {
     private readonly ordersSseService: OrdersSseService,
   ) {}
 
-  async create(dto: CreateOrderDto): Promise<OrderDocument> {
-    this.logger.log(
-      `Procesando pedido de "${dto.cliente}" — menuId: ${dto.menuId} — ${dto.items.length} item(s)`,
-    );
-
-    // 1. Verificar que el menú existe
-    const menu = await this.menuRepository.findById(dto.menuId);
-    if (!menu) {
-      this.logger.warn(`Menu no encontrado — id: ${dto.menuId}`);
-      throw new NotFoundException(`No existe menu con id ${dto.menuId}`);
-    }
-    this.logger.log(`Menu verificado — id: ${dto.menuId}, fecha: ${dto.fecha}`);
-
-    // 2. Verificar existencia y stock de cada plato antes de tocar la DB
-    //    Guardamos los platos para reutilizarlos en el paso 4 (evita segundo fetch y race condition)
-    const dishMap = new Map<string, { nombre: string; stock: number }>();
-
-    for (const item of dto.items) {
-      const dish = await this.dishesRepository.findById(item.platoId);
-
-      if (!dish) {
-        this.logger.warn(
-          `Plato no encontrado — id: ${item.platoId} ("${item.nombre}")`,
+  async create(
+    dto: CreateOrderDto,
+    customer: { googleId: string; email: string },
+    requestId: string,
+  ): Promise<OrderDocument> {
+    const fingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          menuId: dto.menuId,
+          fecha: dto.fecha,
+          cliente: dto.cliente,
+          telefono: dto.telefono,
+          items: dto.items.map((i) => ({
+            platoId: i.platoId,
+            cantidad: i.cantidad,
+            selecciones: Object.fromEntries(
+              Object.entries(i.selecciones ?? {}).sort(),
+            ),
+          })),
+        }),
+      )
+      .digest('hex');
+    const checkExisting = (order: OrderDocument) => {
+      if (order.requestFingerprint !== fingerprint)
+        throw new ConflictException(
+          'Este intento corresponde a otro pedido. Revisa el pedido antes de continuar.',
         );
-        throw new NotFoundException(
-          `No existe plato con id ${item.platoId} ("${item.nombre}")`,
+      return order;
+    };
+    await this.ordersRepository.ensureIndexes();
+    let result: { order: OrderDocument; created: boolean };
+    try {
+      result = await this.connection.transaction(async (session) => {
+        const existing = await this.ordersRepository.findByRequest(
+          customer.googleId,
+          requestId,
+          session,
         );
-      }
-
-      if ((dish.stock ?? 0) < item.cantidad) {
-        this.logger.warn(
-          `Stock insuficiente — plato: "${dish.nombre}" (${item.platoId}), disponible: ${dish.stock}, solicitado: ${item.cantidad}`,
+        if (existing) return { order: checkExisting(existing), created: false };
+        const menu = await this.menuRepository.findById(dto.menuId, session);
+        if (!menu || menu.fecha !== dto.fecha)
+          throw new BadRequestException(
+            'El menú ya no está disponible para esa fecha',
+          );
+        const quantities = new Map<string, number>();
+        for (const item of dto.items)
+          quantities.set(
+            item.platoId,
+            (quantities.get(item.platoId) ?? 0) + item.cantidad,
+          );
+        const dishes = new Map<
+          string,
+          {
+            nombre: string;
+            precio: number;
+            es_hipo: boolean;
+            opciones: string[];
+          }
+        >();
+        for (const [id, quantity] of quantities) {
+          const dish = await this.dishesRepository.reserveStock(
+            id,
+            dto.menuId,
+            quantity,
+            session,
+          );
+          if (!dish)
+            throw new BadRequestException(
+              'Uno de los platos ya no tiene stock suficiente. Revisa tu pedido.',
+            );
+          dishes.set(id, dish);
+        }
+        const items = dto.items.map((item) => {
+          const dish = dishes.get(item.platoId)!;
+          const protein = item.selecciones?.proteina;
+          if (dish.es_hipo && (!protein || !dish.opciones.includes(protein))) {
+            throw new BadRequestException(
+              'Elige una proteína disponible para el menú hipocalórico',
+            );
+          }
+          if (!Number.isSafeInteger(dish.precio) || dish.precio <= 0)
+            throw new BadRequestException('El plato no tiene un precio válido');
+          if (item.precio !== dish.precio)
+            throw new ConflictException({
+              code: 'PRICE_CHANGED',
+              message:
+                'El precio de un plato cambió. Revisa el total actualizado antes de enviar.',
+            });
+          return {
+            ...item,
+            nombre: dish.nombre,
+            precio: dish.precio,
+            selecciones: {
+              ...(dish.es_hipo ? { proteina: protein! } : {}),
+              ensalada: MENU_SALAD,
+              postre: MENU_DESSERT,
+            },
+          };
+        });
+        const total = items.reduce(
+          (sum, item) => sum + item.precio * item.cantidad,
+          0,
         );
-        throw new BadRequestException(
-          `Stock insuficiente para "${dish.nombre}": disponible ${dish.stock ?? 0}, solicitado ${item.cantidad}`,
+        const order = await this.ordersRepository.create(
+          { ...dto, items, total },
+          {
+            customerGoogleId: customer.googleId,
+            customerEmail: customer.email,
+            requestId,
+            requestFingerprint: fingerprint,
+          },
+          session,
         );
-      }
-
-      this.logger.log(
-        `Stock OK — plato: "${dish.nombre}", disponible: ${dish.stock}, solicitado: ${item.cantidad}`,
-      );
-      dishMap.set(item.platoId, {
-        nombre: dish.nombre,
-        stock: dish.stock ?? 0,
+        return { order, created: true };
       });
-    }
-
-    // 3. Crear el pedido en MongoDB (validadoPorAdmin: false por defecto)
-    const order = await this.ordersRepository.create(dto);
-    this.logger.log(
-      `Pedido creado — id: ${order._id}, cliente: "${dto.cliente}"`,
-    );
-
-    // 4. Descontar stock usando los datos ya leídos (sin segundo fetch)
-    for (const item of dto.items) {
-      const cached = dishMap.get(item.platoId);
-      if (cached) {
-        const newStock = cached.stock - item.cantidad;
-        await this.dishesRepository.updateStock(item.platoId, newStock);
-        this.logger.log(
-          `Stock actualizado — plato: "${item.nombre}" (${item.platoId}) -> ${newStock}`,
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        const existing = await this.ordersRepository.findByRequest(
+          customer.googleId,
+          requestId,
         );
+        if (existing) return checkExisting(existing);
       }
+      throw error;
     }
-
-    // 5. Notificar al admin por WhatsApp (no bloquea si falla)
-    void this.whatsappService.notifyOrder(order);
-
-    // 6. Emitir evento SSE al canal admin (aún NO va a cocina)
-    this.ordersSseService.emitToAdmin(order, 'new_order');
-    this.logger.log(
-      `Evento SSE→admin emitido para pedido ${order._id} (pendiente de validación)`,
-    );
-
-    return order;
+    if (result.created) {
+      void this.whatsappService
+        .notifyOrder(result.order)
+        .catch(() =>
+          this.logger.warn('No se pudo completar la notificación WhatsApp'),
+        );
+      this.ordersSseService.emitToAdmin(result.order, 'new_order');
+    }
+    return result.order;
   }
 
   /**
@@ -116,12 +182,22 @@ export class OrdersService {
     const order = await this.ordersRepository.validateByAdmin(id);
 
     if (!order) {
-      this.logger.warn(`Pedido no encontrado para validar — id: ${id}`);
-      throw new NotFoundException(`No existe pedido con id ${id}`);
+      const existing = await this.ordersRepository.findById(id);
+      if (!existing)
+        throw new NotFoundException(`No existe pedido con id ${id}`);
+      if (
+        existing.validadoPorAdmin &&
+        existing.estado !== OrderStatus.CANCELADO
+      )
+        return existing;
+      throw new BadRequestException(
+        'Este pedido ya no está pendiente de aprobación',
+      );
     }
 
     // Emitir al canal de cocina ahora que está aprobado
     this.ordersSseService.emitToKitchen(order, 'order_validated');
+    this.ordersSseService.emitToAdmin(order, 'order_validated');
     this.logger.log(`Pedido ${id} validado por admin → emitido SSE→kitchen`);
 
     return order;
@@ -132,127 +208,65 @@ export class OrdersService {
    * Solo se puede cancelar si el pedido está en estado pendiente o en_preparacion.
    */
   async cancelOrder(id: string): Promise<OrderDocument> {
-    this.logger.log(`Cancelando pedido — id: ${id}`);
-
-    // 1. Obtener el pedido completo para acceder a sus ítems
-    const order = await this.ordersRepository.findById(id);
-
-    if (!order) {
-      this.logger.warn(`Pedido no encontrado para cancelar — id: ${id}`);
-      throw new NotFoundException(`No existe pedido con id ${id}`);
-    }
-
-    // 2. Verificar que el estado permite cancelación
-    const terminales: OrderStatus[] = [
-      OrderStatus.CANCELADO,
-      OrderStatus.ENTREGADO,
-    ];
-    if (terminales.includes(order.estado)) {
-      this.logger.warn(
-        `Cancelación rechazada — pedido ${id} ya está en estado "${order.estado}"`,
-      );
-      throw new BadRequestException(
-        `No se puede cancelar un pedido con estado "${order.estado}"`,
-      );
-    }
-
-    // 3. Restaurar stock por cada ítem
-    for (const item of order.items) {
-      const platoId = (item.platoId as Types.ObjectId).toString();
-      const dish = await this.dishesRepository.findById(platoId);
-
-      if (dish) {
-        const newStock = (dish.stock ?? 0) + item.cantidad;
-        await this.dishesRepository.updateStock(platoId, newStock);
-        this.logger.log(
-          `Stock restaurado — plato: "${item.nombre}" (${platoId}) ${dish.stock ?? 0} -> ${newStock}`,
-        );
-      } else {
-        // El plato pudo haber sido eliminado; solo logueamos y continuamos
-        this.logger.warn(
-          `Plato no encontrado al restaurar stock — id: ${platoId} ("${item.nombre}") — se omite`,
+    const result = await this.connection.transaction(async (session) => {
+      const cancelled = await this.ordersRepository.cancelActive(id, session);
+      if (!cancelled) {
+        const existing = await this.ordersRepository.findById(id, session);
+        if (!existing)
+          throw new NotFoundException(`No existe pedido con id ${id}`);
+        if (existing.estado === OrderStatus.CANCELADO)
+          return { order: existing, changed: false };
+        throw new BadRequestException(
+          'No se puede cancelar un pedido entregado',
         );
       }
+      for (const item of cancelled.items) {
+        await this.dishesRepository.restoreStock(
+          item.platoId.toString(),
+          item.cantidad,
+          session,
+        );
+      }
+      return { order: cancelled, changed: true };
+    });
+    if (result.changed) {
+      this.ordersSseService.emitToAdmin(result.order, 'order_cancelled');
+      if (result.order.validadoPorAdmin)
+        this.ordersSseService.emitToKitchen(result.order, 'status_update');
     }
-
-    // 4. Actualizar estado a cancelado en MongoDB
-    const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
-    this.logger.log(
-      `Pedido ${id} cancelado — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
-    );
-    const cancelled = await this.ordersRepository.updateStatus(
-      id,
-      OrderStatus.CANCELADO,
-      { canceladoEn: ahora },
-    );
-
-    if (!cancelled) {
-      throw new NotFoundException(`No existe pedido con id ${id}`);
-    }
-
-    // 5. Notificar por SSE al canal correspondiente
-    //    Si aún no había llegado a cocina → notificar al admin para que lo retire
-    //    Si ya estaba validado (estaba en cocina) → notificar a cocina
-    if (!cancelled.validadoPorAdmin) {
-      this.ordersSseService.emitToAdmin(cancelled, 'order_cancelled');
-      this.logger.log(`Pedido ${id} cancelado → SSE→admin [order_cancelled]`);
-    } else {
-      this.ordersSseService.emitToKitchen(cancelled, 'status_update');
-      this.logger.log(`Pedido ${id} cancelado → SSE→kitchen [status_update]`);
-    }
-
-    return cancelled;
+    return result.order;
   }
 
   async updateStatus(
     id: string,
     dto: UpdateOrderStatusDto,
   ): Promise<OrderDocument> {
-    this.logger.log(`Actualizando estado pedido ${id} -> ${dto.estado}`);
-
-    const ahora = DateTime.now().setZone(SANTIAGO_TZ).toJSDate();
-    const timestamps: {
-      aceptadoEn?: Date;
-      entregadoEn?: Date;
-      canceladoEn?: Date;
-    } = {};
-
-    if (dto.estado === OrderStatus.EN_PREPARACION) {
-      timestamps.aceptadoEn = ahora;
-      this.logger.log(
-        `Pedido ${id} pasa a EN_PREPARACION — aceptadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
+    if (
+      ![OrderStatus.EN_PREPARACION, OrderStatus.ENTREGADO].includes(dto.estado)
+    )
+      throw new BadRequestException(
+        'Usa la acción de cancelación para restaurar stock',
       );
-    } else if (dto.estado === OrderStatus.ENTREGADO) {
-      timestamps.entregadoEn = ahora;
-      this.logger.log(
-        `Pedido ${id} pasa a ENTREGADO — entregadoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
-      );
-    } else if (dto.estado === OrderStatus.CANCELADO) {
-      timestamps.canceladoEn = ahora;
-      this.logger.log(
-        `Pedido ${id} pasa a CANCELADO — canceladoEn: ${DateTime.fromJSDate(ahora, { zone: SANTIAGO_TZ }).toFormat('yyyy-MM-dd HH:mm:ss')}`,
-      );
-    }
-
-    const order = await this.ordersRepository.updateStatus(
+    const previous =
+      dto.estado === OrderStatus.EN_PREPARACION
+        ? OrderStatus.PENDIENTE
+        : OrderStatus.EN_PREPARACION;
+    const order = await this.ordersRepository.advanceStatus(
       id,
+      previous,
       dto.estado,
-      timestamps,
     );
-
     if (!order) {
-      this.logger.warn(
-        `Pedido no encontrado para actualizar estado — id: ${id}`,
+      const existing = await this.ordersRepository.findById(id);
+      if (!existing)
+        throw new NotFoundException(`No existe pedido con id ${id}`);
+      if (existing.validadoPorAdmin && existing.estado === dto.estado)
+        return existing;
+      throw new ConflictException(
+        'El pedido cambió de estado o todavía no fue aprobado. Actualiza la lista.',
       );
-      throw new NotFoundException(`No existe pedido con id ${id}`);
     }
-
-    // Cambios de estado van al canal de cocina
     this.ordersSseService.emitToKitchen(order, 'status_update');
-    this.logger.log(
-      `Estado actualizado — pedido: ${id}, estado: ${dto.estado}`,
-    );
-
     return order;
   }
 

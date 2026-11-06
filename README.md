@@ -10,14 +10,16 @@ Backend del sistema de pedidos de almuerzo. Construido con **NestJS v11**, **Mon
 - **Upload:** Multer + Cloudinary
 - **Real-time:** Server-Sent Events (SSE) con RxJS
 - **Validación:** class-validator + class-transformer
-- **Node:** v22 (ver `.nvmrc`)
+- **Node:** v24.22.2 LTS (ver `.nvmrc`)
 
 ---
 
 ## Instalación y configuración local
 
 ```bash
-# 1. Instalar dependencias
+# 1. Activar Node.js e instalar dependencias
+nvm install
+nvm use
 npm install
 
 # 2. Copiar variables de entorno
@@ -117,51 +119,54 @@ npm run start:prod
 
 1. Abre **Insomnia** → **Create** → **Import**
 2. Selecciona el archivo `insomnia-collection.json`
-3. Elige el environment: **Local** o **Production (Fly.io)**
+3. Elige el environment: **Local** o **Production (Heroku)**
 4. Ejecuta `POST /auth/login`, copia el `access_token` y pégalo en la variable `jwt_token` del environment
 
 Ver `INSOMNIA_REQUESTS.md` para ejemplos detallados de cada request.
 
 ---
 
-## Deploy en Fly.io
+## Deploy en Heroku
 
-El proyecto incluye `Dockerfile` (multi-stage) y `fly.toml` listos para deploy.
+Usar una aplicación Heroku para este backend y otra para el frontend.
+El buildpack `heroku/nodejs` instala dependencias, ejecuta `heroku-postbuild`
+y el `Procfile` inicia el código compilado con `npm run start:prod`.
+Node.js se selecciona desde `engines.node` en `package.json`.
 
-```bash
-# 1. Instalar flyctl
-brew install flyctl
+1. Instala Heroku CLI e inicia sesión con `heroku login`.
+2. Desde este repositorio crea la aplicación (reemplaza el nombre de ejemplo):
 
-# 2. Login
-fly auth login
+   ```bash
+   heroku create tu-app-backend --buildpack heroku/nodejs
+   ```
 
-# 3. Crear la app (solo la primera vez)
-fly launch --name delivery-lunch-back --region gru --no-deploy
+3. En **Settings → Config Vars**, configura los valores de `.env.example`:
+   `MONGODB_URI`, `MONGODB_DB_NAME`, `JWT_SECRET`, `JWT_EXPIRES_IN`,
+   `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `CLOUDINARY_CLOUD_NAME`,
+   `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET`.
+   Los hashes son bcrypt, no contraseñas en texto plano.
+   Para habilitar cocina agrega `KITCHEN_USERNAME` y `KITCHEN_PASSWORD_HASH`.
+   Para WhatsApp agrega `WHATSAPP_NOTIFY_PHONE` y `CALLMEBOT_API_KEY`.
+   No configures `PORT`: Heroku lo asigna automáticamente.
+   Asegura que MongoDB Atlas permita las conexiones de la aplicación desplegada.
+4. Guarda los cambios en Git, incluyendo `package-lock.json`, y despliega:
 
-# 4. Configurar variables de entorno secretas
-fly secrets set MONGODB_URI="mongodb+srv://..." \
-  MONGODB_DB_NAME="delivery_lunch" \
-  JWT_SECRET="..." \
-  JWT_EXPIRES_IN="7d" \
-  ADMIN_USERNAME="admin" \
-  ADMIN_PASSWORD_HASH='$2b$10$...' \
-  CLOUDINARY_CLOUD_NAME="..." \
-  CLOUDINARY_API_KEY="..." \
-  CLOUDINARY_API_SECRET="..." \
-  WHATSAPP_NOTIFY_PHONE="..." \
-  CALLMEBOT_API_KEY="..."
+   ```bash
+   git push heroku main
+   heroku ps:scale web=1
+   heroku logs --tail
+   ```
 
-# 5. Deploy
-fly deploy
-```
+Obtén la URL real con `heroku info`; úsala en el environment de Insomnia y en
+`VITE_API_BASE_URL` del frontend. La URL de ejemplo de la colección debe reemplazarse.
+Swagger está disponible en `/api-docs`.
 
-La app quedará disponible en `https://delivery-lunch-back.fly.dev`.
+Los secretos se configuran en Heroku; `.env` y `.env.local` son solo locales.
+El `Dockerfile` queda disponible para builds de contenedor independientes.
+Este flujo de Heroku usa el buildpack de Node.js.
 
-Para deploys posteriores solo se necesita:
-
-```bash
-fly deploy
-```
+Referencias: [Node.js en Heroku](https://devcenter.heroku.com/articles/nodejs-support)
+y [proceso de build](https://devcenter.heroku.com/articles/nodejs-classic-buildpack-builds).
 
 ---
 
@@ -196,3 +201,60 @@ src/
 ├── config/        # Configuración de app, base de datos y constantes
 └── database/      # Seeds
 ```
+
+## Flujo local con Google y pedidos seguros
+
+Para una demostración aislada ejecuta `nvm use` y `npm run start:local`.
+Este comando compila la API y levanta un replica set MongoDB temporal con los platos del menú de ejemplo.
+Ignora la URI de base de datos del `.env` y desactiva WhatsApp; no toca datos reales.
+El puerto usa `PORT` del entorno o `.env` (3500 si no se configura).
+La cuenta de personal de la demo es `admin/admin` y `cocina/cocina`.
+Los datos de demostración se eliminan al detener el proceso.
+
+En el frontend, configura `VITE_API_BASE_URL` con el puerto indicado por la API
+local, `VITE_GOOGLE_CLIENT_ID` y ejecuta `npm run dev`.
+En Google Cloud, autoriza `http://localhost:5173` como origen JavaScript del cliente web.
+Si abres el frontend por `http://127.0.0.1:5173`, autoriza también ese origen.
+No copies `GOOGLE_CLIENT_SECRET` al frontend. El acceso usa Google Identity Services
+con ID tokens, por lo que solo necesita `GOOGLE_CLIENT_ID` en el backend.
+
+`POST /auth/google` valida el ID token de Google y devuelve una sesión de cliente
+con duración de una hora. `POST /orders` requiere ese JWT con rol `customer` y
+un header `Idempotency-Key` UUID v4. Admin y cocina mantienen su login separado;
+no pueden crear pedidos usando sus tokens de personal.
+
+El frontend conserva el carrito, los datos de contacto y el intento pendiente en
+sessionStorage. Ante un envío de resultado incierto, reintenta exactamente el mismo
+pedido y key. La API evita duplicados mediante índice único por cuenta y key,
+reserva el stock y crea el pedido dentro de una transacción; usa el precio guardado de cada plato y calcula el total según la cantidad. Si el precio cambió desde la carga del carrito, rechaza el envío con `409 PRICE_CHANGED` para que el cliente revise el nuevo total. Para usar una base persistente con `npm run start:dev`,
+MongoDB debe estar configurado como replica set; el modo standalone no admite estas transacciones.
+
+Pruebas locales aisladas:
+
+```bash
+npm test -- --runInBand
+npm run test:e2e -- --runInBand --testPathPatterns="customer-access|menu-pricing-access"
+```
+
+Los tests usan MongoDB temporal y notificaciones simuladas. La primera ejecución
+puede descargar un binario de MongoDB. El inicio de sesión real con Google se
+comprueba manualmente con una cuenta del usuario; los tests simulan la respuesta de Google.
+
+## Menú completo
+
+El precio general del menú (`precioBase`) comienza en $5.500 y se administra por fecha
+en **Admin → Menús** (`/admin/menus` en el frontend). Cada plato conserva su precio
+real (`precio`). En el home solo los platos que cuestan distinto al precio general
+muestran su precio junto a Agregar; los demás muestran únicamente el botón.
+
+Todos los menús incluyen ensalada surtida, pan fresco del día
+y postre del día, sin selección de ensalada ni postre. Solo el menú hipocalórico
+permite y requiere elegir una proteína de sus opciones disponibles. La API valida
+esta elección y calcula el total con los precios guardados al crear el pedido.
+
+`PATCH /menu/:id/prices` requiere JWT de administrador. Recibe `precioBase`,
+`platos: [{ id, precio }]` con todos los platos del menú y opcionalmente
+`expectedUpdatedAt` para detectar cambios de otro administrador. Los montos deben
+ser enteros positivos en CLP. Guarda precio general y precios de platos en una
+transacción, sin cambiar existencias ni pedidos ya creados. El frontend envía
+`expectedUpdatedAt` y permite elegir un precio especial o volver al precio general.
