@@ -2,6 +2,9 @@ export class DashboardSummaryDto {
   pedidosTotales: number;
   pedidosCompletados: number;
   pedidosCancelados: number;
+  pedidosPendientes: number;
+  pedidosEnPreparacion: number;
+  menusVendidos: number;
   tasaCompletacion: number;
   ingresosTotales: number;
   ticketPromedio: number;

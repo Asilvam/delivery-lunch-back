@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { StatisticsService } from './statistics.service';
+import { statisticsDateRange } from './date-range';
 
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -25,8 +26,10 @@ export class StatisticsController {
       `GET /statistics/summary — ${startDate || 'start'} a ${endDate || 'end'}`,
     );
 
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || start;
+    const { startDate: start, endDate: end } = statisticsDateRange(
+      startDate,
+      endDate,
+    );
 
     return this.statisticsService.getDashboardSummary(start, end);
   }
@@ -39,8 +42,10 @@ export class StatisticsController {
   ) {
     this.logger.log(`GET /statistics/top-dishes — limit: ${limit || 10}`);
 
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || start;
+    const { startDate: start, endDate: end } = statisticsDateRange(
+      startDate,
+      endDate,
+    );
 
     return this.statisticsService.getTopDishes(start, end, limit || 10);
   }
@@ -52,8 +57,10 @@ export class StatisticsController {
   ) {
     this.logger.log(`GET /statistics/peak-hours`);
 
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || start;
+    const { startDate: start, endDate: end } = statisticsDateRange(
+      startDate,
+      endDate,
+    );
 
     return this.statisticsService.getPeakHours(start, end);
   }
@@ -65,8 +72,10 @@ export class StatisticsController {
   ) {
     this.logger.log(`GET /statistics/revenue`);
 
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || start;
+    const { startDate: start, endDate: end } = statisticsDateRange(
+      startDate,
+      endDate,
+    );
 
     return this.statisticsService.getRevenueByDay(start, end);
   }
@@ -78,8 +87,10 @@ export class StatisticsController {
   ) {
     this.logger.log(`GET /statistics/cancellations`);
 
-    const start = startDate || new Date().toISOString().split('T')[0];
-    const end = endDate || start;
+    const { startDate: start, endDate: end } = statisticsDateRange(
+      startDate,
+      endDate,
+    );
 
     return this.statisticsService.getCancellationStats(start, end);
   }
