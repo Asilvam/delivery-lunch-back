@@ -24,7 +24,7 @@ export class MenuPricingService {
       const menu = await this.menus.findById(id).session(session).lean();
       if (!menu) throw new NotFoundException('No existe el menú');
       const current = await this.dishes
-        .find({ menuId: new Types.ObjectId(id) })
+        .find({ menuId: new Types.ObjectId(id), retirado: { $ne: true } })
         .session(session)
         .lean();
       const ids = new Set(current.map((dish) => String(dish._id)));
@@ -72,7 +72,7 @@ export class MenuPricingService {
         { session },
       );
       const platos = await this.dishes
-        .find({ menuId: new Types.ObjectId(id) })
+        .find({ menuId: new Types.ObjectId(id), retirado: { $ne: true } })
         .session(session)
         .lean<Dish[]>();
       return { ...updated, platos };

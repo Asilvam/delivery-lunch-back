@@ -17,6 +17,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { MenuCompositionService } from './menu-composition.service';
 import { MenuCompositionDto } from './dto/menu-composition.dto';
+import { MenuPublicationService } from './menu-publication.service';
+import { UpdateMenuPublicationDto } from './dto/menu-publication.dto';
 import { MenuPricingService } from './menu-pricing.service';
 import { UpdateMenuPricesDto } from './dto/update-menu-prices.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -42,7 +44,18 @@ export class MenuController {
     private readonly menuService: MenuService,
     private readonly pricing: MenuPricingService,
     private readonly composition: MenuCompositionService,
+    private readonly publication: MenuPublicationService,
   ) {}
+
+  @Patch(':id/publication')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  updatePublication(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Body() input: UpdateMenuPublicationDto,
+  ) {
+    return this.publication.update(id, input);
+  }
 
   @Patch(':id/prices')
   @UseGuards(JwtAuthGuard, RolesGuard)

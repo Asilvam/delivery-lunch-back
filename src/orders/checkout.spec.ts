@@ -1,3 +1,4 @@
+import * as orderingHours from '../common/utils/ordering-hours';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createConnection, Connection, Types } from 'mongoose';
 import { OrdersService } from './orders.service';
@@ -52,7 +53,7 @@ describe('Local checkout transactions', () => {
       {
         findById: jest.fn().mockResolvedValue({ fecha: '2026-11-05' }),
       } as unknown as MenuRepository,
-      new DishesRepository(dishModel),
+      new DishesRepository(conn, orderModel, dishModel),
       { notifyOrder: notify } as unknown as WhatsappService,
       {
         emitToAdmin: emit,
@@ -62,9 +63,10 @@ describe('Local checkout transactions', () => {
     await orderModel.init();
   });
   beforeEach(async () => {
+    jest.spyOn(orderingHours, 'isOrderingOpen').mockReturnValue(true);
     await conn.model(Order.name).deleteMany({});
-    await conn.model(Dish.name).deleteMany({});
-    await conn.model(Dish.name).create({
+    await conn.model<Dish>(Dish.name).deleteMany({});
+    await conn.model<Dish>(Dish.name).create({
       _id: dishId,
       menuId,
       nombre: 'Plato real',
@@ -86,7 +88,7 @@ describe('Local checkout transactions', () => {
     expect(first.total).toBe(5000);
     expect(first.customerGoogleId).toBe(customer.googleId);
     expect(first.items[0].nombre).toBe('Plato real');
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(2);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledTimes(1);
   });
@@ -99,7 +101,7 @@ describe('Local checkout transactions', () => {
       status: 409,
       response: { code: 'PRICE_CHANGED' },
     });
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(3);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
     expect(await conn.model(Order.name).countDocuments()).toBe(0);
     expect(notify).not.toHaveBeenCalled();
   });
@@ -111,7 +113,7 @@ describe('Local checkout transactions', () => {
     ]);
     expect(results[0]._id.toString()).toBe(results[1]._id.toString());
     expect(await conn.model(Order.name).countDocuments()).toBe(1);
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(2);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
   });
   it('rolls back earlier stock reservations when another dish is unavailable', async () => {
     const input = payload();
@@ -122,7 +124,7 @@ describe('Local checkout transactions', () => {
     await expect(
       service.create(input, customer, randomUUID()),
     ).rejects.toMatchObject({ status: 400 });
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(3);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
     expect(await conn.model(Order.name).countDocuments()).toBe(0);
     expect(notify).not.toHaveBeenCalled();
   });
@@ -145,7 +147,7 @@ describe('Local checkout transactions', () => {
     await expect(
       service.create(input, customer, randomUUID()),
     ).rejects.toMatchObject({ status: 400 });
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(3);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
   });
   it('restores stock once when cancellation is retried concurrently', async () => {
     const order = await service.create(payload(), customer, randomUUID());
@@ -153,7 +155,7 @@ describe('Local checkout transactions', () => {
       service.cancelOrder(order._id.toString()),
       service.cancelOrder(order._id.toString()),
     ]);
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(3);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
   });
   it('requires approval and sequential preparation before delivery', async () => {
     const order = await service.create(payload(), customer, randomUUID());
@@ -170,17 +172,17 @@ describe('Local checkout transactions', () => {
     await expect(service.cancelOrder(id)).rejects.toMatchObject({
       status: 400,
     });
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(2);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
   });
   it('requires protein only for the hypocaloric menu and rolls back invalid selections', async () => {
-    await conn.model(Dish.name).findByIdAndUpdate(dishId, {
+    await conn.model<Dish>(Dish.name).findByIdAndUpdate(dishId, {
       es_hipo: true,
       opciones: ['Atún', 'Pollo asado'],
     });
     await expect(
       service.create(payload(), customer, randomUUID()),
     ).rejects.toMatchObject({ status: 400 });
-    expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(3);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
     const input = payload();
     input.items[0].selecciones = {
       proteina: 'Atún',
@@ -194,5 +196,20 @@ describe('Local checkout transactions', () => {
       ensalada: 'Ensalada surtida',
       postre: 'Postre del día',
     });
+  });
+  it('rolls back a reservation if closing time is reached before saving the order', async () => {
+    jest
+      .mocked(orderingHours.isOrderingOpen)
+      .mockReturnValueOnce(true)
+      .mockReturnValue(false);
+    await expect(
+      service.create(payload(), customer, randomUUID()),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'ORDERING_CLOSED' },
+    });
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
+    expect(await conn.model(Order.name).countDocuments()).toBe(0);
+    expect(notify).not.toHaveBeenCalled();
   });
 });

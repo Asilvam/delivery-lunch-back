@@ -2,6 +2,7 @@ import { MENU_SALAD, MENU_DESSERT } from '../menu/constants/menu.constants';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -18,6 +19,7 @@ import { OrdersRepository } from './repositories/orders.repository';
 import { OrderDocument } from './schemas/order.schema';
 import { OrdersSseService } from './services/orders-sse.service';
 import { WhatsappService } from './services/whatsapp.service';
+import { isOrderingOpen } from '../common/utils/ordering-hours';
 
 @Injectable()
 export class OrdersService {
@@ -31,6 +33,14 @@ export class OrdersService {
     private readonly whatsappService: WhatsappService,
     private readonly ordersSseService: OrdersSseService,
   ) {}
+
+  private ensureOrderingOpen() {
+    if (!isOrderingOpen())
+      throw new ForbiddenException({
+        code: 'ORDERING_CLOSED',
+        message: 'Los pedidos están disponibles de 08:00 a 16:00.',
+      });
+  }
 
   async create(
     dto: CreateOrderDto,
@@ -71,6 +81,7 @@ export class OrdersService {
           session,
         );
         if (existing) return { order: checkExisting(existing), created: false };
+        this.ensureOrderingOpen();
         const menu = await this.menuRepository.findById(dto.menuId, session);
         if (!menu || menu.estado === 'borrador' || menu.fecha !== dto.fecha)
           throw new BadRequestException(
@@ -135,6 +146,7 @@ export class OrdersService {
           (sum, item) => sum + item.precio * item.cantidad,
           0,
         );
+        this.ensureOrderingOpen();
         const order = await this.ordersRepository.create(
           { ...dto, items, total },
           {
@@ -147,7 +159,7 @@ export class OrdersService {
         );
         return { order, created: true };
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (
         typeof error === 'object' &&
         error !== null &&

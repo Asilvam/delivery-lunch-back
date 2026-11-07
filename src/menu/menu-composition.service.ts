@@ -13,6 +13,7 @@ import {
   LibraryDishDocument,
 } from '../dish-library/dish-library.schema';
 import { DishLibraryService } from '../dish-library/dish-library.service';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { MenuCompositionDto } from './dto/menu-composition.dto';
 
 export interface AdminMenuData {
@@ -30,6 +31,7 @@ export class MenuCompositionService {
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Menu.name) private readonly menus: Model<MenuDocument>,
     @InjectModel(Dish.name) private readonly dishes: Model<DishDocument>,
+    @InjectModel(Order.name) private readonly orders: Model<OrderDocument>,
     @InjectModel(LibraryDish.name)
     private readonly library: Model<LibraryDishDocument>,
     private readonly libraryService: DishLibraryService,
@@ -38,6 +40,18 @@ export class MenuCompositionService {
   async list(fecha?: string): Promise<AdminMenuData[]> {
     if (fecha) {
       const menu = await this.menus.findOne({ fecha }).lean();
+      const used = menu
+        ? new Set(
+            (
+              await this.orders.distinct<'items.platoId', Types.ObjectId>(
+                'items.platoId',
+                {
+                  menuId: menu._id,
+                },
+              )
+            ).map(String),
+          )
+        : new Set<string>();
       return menu
         ? [
             {
@@ -45,7 +59,13 @@ export class MenuCompositionService {
               platos: await this.dishes
                 .find({ menuId: menu._id })
                 .sort({ orden: 1, _id: 1 })
-                .lean(),
+                .lean()
+                .then((dishes) =>
+                  dishes.map((dish) => ({
+                    ...dish,
+                    tienePedidos: used.has(String(dish._id)),
+                  })),
+                ),
             },
           ]
         : [];

@@ -4,6 +4,7 @@ import { Menu, MenuSchema } from './schemas/menu.schema';
 import { Dish, DishSchema } from '../dishes/schemas/dish.schema';
 import { MenuPricingService } from './menu-pricing.service';
 import { MenuRepository } from './repositories/menu.repository';
+import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { DishesRepository } from '../dishes/repositories/dishes.repository';
 jest.setTimeout(180000);
 describe('Menu price administration', () => {
@@ -16,6 +17,7 @@ describe('Menu price administration', () => {
   beforeAll(async () => {
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     conn = await createConnection(mongo.getUri()).asPromise();
+    conn.model(Order.name, OrderSchema);
     const menus = conn.model(Menu.name, MenuSchema);
     const dishes = conn.model(Dish.name, DishSchema);
     service = new MenuPricingService(conn, menus, dishes);
@@ -23,14 +25,12 @@ describe('Menu price administration', () => {
   beforeEach(async () => {
     await conn.model(Menu.name).deleteMany({});
     await conn.model(Dish.name).deleteMany({});
-    await conn
-      .model(Menu.name)
-      .create({
-        _id: menuId,
-        fecha: '2026-11-05',
-        pan: 'Pan fresco',
-        precioBase: 5500,
-      });
+    await conn.model(Menu.name).create({
+      _id: menuId,
+      fecha: '2026-11-05',
+      pan: 'Pan fresco',
+      precioBase: 5500,
+    });
     await conn.model(Dish.name).create([
       { _id: dishId, menuId, nombre: 'Pollo', precio: 5500, stock: 7 },
       { _id: secondId, menuId, nombre: 'Hipo', precio: 5500, stock: 2 },
@@ -59,8 +59,10 @@ describe('Menu price administration', () => {
     ]);
     expect((await conn.model(Dish.name).findById(dishId)).stock).toBe(7);
     const read = await new MenuRepository(
+      conn,
       conn.model(Menu.name),
-      new DishesRepository(conn.model(Dish.name)),
+      conn.model(Order.name),
+      new DishesRepository(conn, conn.model(Order.name), conn.model(Dish.name)),
     ).findByDate('2026-11-05');
     expect(read?.precioBase).toBe(6500);
     expect(read?.platos.map((dish) => dish.precio).sort()).toEqual([

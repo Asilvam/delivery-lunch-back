@@ -14,6 +14,7 @@ export class Dish {
   @Prop({ type: Number, default: null }) precioEspecial?: number | null;
   @Prop({ min: 0 }) stockInicial?: number;
   @Prop({ default: 0 }) orden?: number;
+  @Prop({ default: false }) retirado?: boolean;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Menu', required: true })
   menuId: Types.ObjectId;

@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, ClientSession } from 'mongoose';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Model, Types, ClientSession, Connection } from 'mongoose';
+import { Order, OrderDocument } from '../../orders/schemas/order.schema';
 import { CreateDishDto } from '../dto/create-dish.dto';
 import { UpdateDishDto } from '../dto/update-dish.dto';
 import { Dish, DishDocument } from '../schemas/dish.schema';
@@ -10,6 +11,8 @@ export class DishesRepository {
   private readonly logger = new Logger(DishesRepository.name);
 
   constructor(
+    @InjectConnection() private readonly connection: Connection,
+    @InjectModel(Order.name) private readonly orders: Model<OrderDocument>,
     @InjectModel(Dish.name)
     private readonly dishModel: Model<DishDocument>,
   ) {}
@@ -25,7 +28,7 @@ export class DishesRepository {
   async findByMenuId(menuId: string, session?: ClientSession): Promise<Dish[]> {
     this.logger.log(`Buscando platos para menuId: ${menuId}`);
     const dishes = await this.dishModel
-      .find({ menuId: new Types.ObjectId(menuId) })
+      .find({ menuId: new Types.ObjectId(menuId), retirado: { $ne: true } })
       .session(session ?? null)
       .sort({ orden: 1, _id: 1 })
       .lean<Dish[]>();
@@ -54,6 +57,7 @@ export class DishesRepository {
           _id: new Types.ObjectId(id),
           menuId: new Types.ObjectId(menuId),
           stock: { $gte: quantity },
+          retirado: { $ne: true },
         },
         { $inc: { stock: -quantity } },
         { new: true, session },
@@ -80,11 +84,23 @@ export class DishesRepository {
   }
 
   async remove(id: string): Promise<Dish | null> {
-    return this.dishModel.findByIdAndDelete(id).lean<Dish>();
+    return this.connection.transaction(async (session) => {
+      if (
+        await this.orders
+          .exists({ 'items.platoId': new Types.ObjectId(id) })
+          .session(session)
+      )
+        throw new ConflictException(
+          'Este plato tiene pedidos. Pon su stock en 0 para marcarlo agotado.',
+        );
+      return this.dishModel.findByIdAndDelete(id, { session }).lean<Dish>();
+    });
   }
 
-  async removeByMenuId(menuId: string): Promise<void> {
-    await this.dishModel.deleteMany({ menuId: new Types.ObjectId(menuId) });
+  async removeByMenuId(menuId: string, session?: ClientSession): Promise<void> {
+    await this.dishModel
+      .deleteMany({ menuId: new Types.ObjectId(menuId) })
+      .session(session ?? null);
   }
 
   async copyToMenu(

@@ -6,7 +6,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pollo',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003979/delivery-lunch/biblioteca/pollo-asado-arroz-papas-fritas-7be5b8760d4b.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017542/delivery-lunch/biblioteca/pollo-asado-arroz-papas-fritas-7be5b8760d4b.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/pollo-asado-arroz-papas-fritas-7be5b8760d4b',
     esHipo: false,
@@ -20,7 +20,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pollo',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003981/delivery-lunch/biblioteca/pollo-asado-fideos-c3af6fde4fa3.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017545/delivery-lunch/biblioteca/pollo-asado-fideos-c3af6fde4fa3.png',
     imagenPublicId: 'delivery-lunch/biblioteca/pollo-asado-fideos-c3af6fde4fa3',
     esHipo: false,
     opciones: [],
@@ -33,7 +33,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Cerdo',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003981/delivery-lunch/biblioteca/cerdo-mongoliano-arroz-aac3bfcc4cf8.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017549/delivery-lunch/biblioteca/cerdo-mongoliano-arroz-aac3bfcc4cf8.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/cerdo-mongoliano-arroz-aac3bfcc4cf8',
     esHipo: false,
@@ -47,7 +47,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Cerdo',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003982/delivery-lunch/biblioteca/cerdo-mongoliano-fideos-5a39896645e3.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017552/delivery-lunch/biblioteca/cerdo-mongoliano-fideos-5a39896645e3.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/cerdo-mongoliano-fideos-5a39896645e3',
     esHipo: false,
@@ -61,7 +61,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Legumbres',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003983/delivery-lunch/biblioteca/porotos-con-riendas-f424526f4013.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017555/delivery-lunch/biblioteca/porotos-con-riendas-f424526f4013.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/porotos-con-riendas-f424526f4013',
     esHipo: false,
@@ -75,7 +75,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Hipocalórico',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003988/delivery-lunch/biblioteca/menu-hipocalorico-ddc396ae1e79.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017558/delivery-lunch/biblioteca/menu-hipocalorico-ddc396ae1e79.png',
     imagenPublicId: 'delivery-lunch/biblioteca/menu-hipocalorico-ddc396ae1e79',
     esHipo: true,
     opciones: [
@@ -180,7 +180,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pulpa',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794015249/delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-586cee3a962a.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017516/delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-586cee3a962a.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-586cee3a962a',
     esHipo: false,
@@ -207,7 +207,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pulpa',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794015247/delivery-lunch/biblioteca/pulpa-asada-fideos-ecc432356154.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017519/delivery-lunch/biblioteca/pulpa-asada-fideos-ecc432356154.png',
     imagenPublicId: 'delivery-lunch/biblioteca/pulpa-asada-fideos-ecc432356154',
     esHipo: false,
     opciones: [],
@@ -234,7 +234,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Carne al jugo',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004005/delivery-lunch/biblioteca/carne-al-jugo-fideos-salsa-35f1b91acc3f.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017522/delivery-lunch/biblioteca/carne-al-jugo-fideos-salsa-35f1b91acc3f.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/carne-al-jugo-fideos-salsa-35f1b91acc3f',
     esHipo: false,
@@ -248,7 +248,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Tradicional',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004006/delivery-lunch/biblioteca/cazuela-vacuno-7ed88f9c62de.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017524/delivery-lunch/biblioteca/cazuela-vacuno-7ed88f9c62de.png',
     imagenPublicId: 'delivery-lunch/biblioteca/cazuela-vacuno-7ed88f9c62de',
     esHipo: false,
     opciones: [],
@@ -261,7 +261,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Legumbres',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004006/delivery-lunch/biblioteca/lentejas-cerdo-horno-242fb553cb3f.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017526/delivery-lunch/biblioteca/lentejas-cerdo-horno-242fb553cb3f.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/lentejas-cerdo-horno-242fb553cb3f',
     esHipo: false,
@@ -275,7 +275,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Zapallo italiano',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004007/delivery-lunch/biblioteca/zapallo-italiano-arroz-papas-fritas-f40a882ff29d.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017529/delivery-lunch/biblioteca/zapallo-italiano-arroz-papas-fritas-f40a882ff29d.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/zapallo-italiano-arroz-papas-fritas-f40a882ff29d',
     esHipo: false,
@@ -290,7 +290,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pastas',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004008/delivery-lunch/biblioteca/lasana-3e16d3366b78.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017533/delivery-lunch/biblioteca/lasana-3e16d3366b78.png',
     imagenPublicId: 'delivery-lunch/biblioteca/lasana-3e16d3366b78',
     esHipo: false,
     opciones: [],
@@ -304,7 +304,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Tradicional',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004008/delivery-lunch/biblioteca/charquican-huevo-d3cfff4e4447.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017537/delivery-lunch/biblioteca/charquican-huevo-d3cfff4e4447.png',
     imagenPublicId: 'delivery-lunch/biblioteca/charquican-huevo-d3cfff4e4447',
     esHipo: false,
     opciones: [],
@@ -317,7 +317,7 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Tradicional',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004009/delivery-lunch/biblioteca/charquican-bife-cerdo-bf907dde7a07.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794017539/delivery-lunch/biblioteca/charquican-bife-cerdo-bf907dde7a07.png',
     imagenPublicId:
       'delivery-lunch/biblioteca/charquican-bife-cerdo-bf907dde7a07',
     esHipo: false,

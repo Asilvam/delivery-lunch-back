@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Model, ClientSession, Connection, Types } from 'mongoose';
+import { Order, OrderDocument } from '../../orders/schemas/order.schema';
 import { MENU_PRICE } from '../constants/menu.constants';
 import { DishesRepository } from '../../dishes/repositories/dishes.repository';
 import { CreateMenuDto } from '../dto/create-menu.dto';
@@ -16,6 +17,7 @@ export class MenuRepository {
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Menu.name)
     private readonly menuModel: Model<MenuDocument>,
+    @InjectModel(Order.name) private readonly orders: Model<OrderDocument>,
     private readonly dishesRepository: DishesRepository,
   ) {}
 
@@ -68,13 +70,21 @@ export class MenuRepository {
   }
 
   async remove(id: string): Promise<Menu | null> {
-    const menu = await this.menuModel.findByIdAndDelete(id).lean<Menu>();
-
-    if (menu) {
-      await this.dishesRepository.removeByMenuId(id);
-    }
-
-    return menu;
+    return this.connection.transaction(async (session) => {
+      if (
+        await this.orders
+          .exists({ menuId: new Types.ObjectId(id) })
+          .session(session)
+      )
+        throw new ConflictException(
+          'Este menú tiene pedidos y no puede eliminarse. Puedes poner los platos en stock 0.',
+        );
+      const menu = await this.menuModel
+        .findByIdAndDelete(id, { session })
+        .lean<Menu>();
+      if (menu) await this.dishesRepository.removeByMenuId(id, session);
+      return menu;
+    });
   }
 
   async copy(id: string, fecha: string): Promise<MenuWithDishes | null> {

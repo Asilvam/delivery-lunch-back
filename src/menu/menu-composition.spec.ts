@@ -1,3 +1,4 @@
+import * as orderingHours from '../common/utils/ordering-hours';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -30,6 +31,9 @@ interface SavedMenu {
     precio: number;
     stock: number;
     opciones: string[];
+    catalogoId?: string;
+    retirado?: boolean;
+    tienePedidos?: boolean;
   }[];
 }
 const body = async <T>(query: HttpTest, status = 200): Promise<T> =>
@@ -42,10 +46,11 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
   let library: Model<LibraryDishDocument>;
   let menus: Model<MenuDocument>;
   let dishes: Model<DishDocument>;
-  const notify = jest.fn();
+  const notify = jest.fn().mockResolvedValue(undefined);
   const http = () => request(app.getHttpServer() as Server);
   const api = (token: string) => ({ Authorization: `Bearer ${token}` });
   beforeAll(async () => {
+    jest.spyOn(orderingHours, 'isOrderingOpen').mockReturnValue(true);
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     const module = await Test.createTestingModule({
       imports: [
@@ -102,6 +107,7 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
   afterAll(async () => {
     if (app) await app.close();
     if (mongo) await mongo.stop();
+    jest.restoreAllMocks();
   });
 
   it('requires admin for library, draft access, import, publication and uploads', async () => {
@@ -328,5 +334,227 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
       })
       .expect(400);
     expect(await menus.countDocuments({ fecha: input.fecha })).toBe(0);
+  });
+  it('edits a publication without losing stock, changing order snapshots or deleting referenced dishes', async () => {
+    const regular = (await library.findOne({ clave: 'porotos-con-riendas' }))!;
+    const second = (await library.findOne({
+      clave: 'pollo-krispy-arroz-papas-fritas',
+    }))!;
+    const added = (await library.findOne({
+      clave: 'pollo-asado-arroz-papas-mayo',
+    }))!;
+    const published = await body<SavedMenu>(
+      http()
+        .post('/menu/composition')
+        .set(api(admin))
+        .send({
+          fecha: '2031-01-02',
+          precioBase: 5500,
+          estado: 'publicado',
+          ensalada: ['Ensalada'],
+          pan: 'Pan',
+          postre: ['Fruta'],
+          platos: [
+            { catalogoId: String(regular._id), stock: 10 },
+            { catalogoId: String(second._id), stock: 5 },
+          ],
+        }),
+      201,
+    );
+    const firstId = published.platos[0]._id,
+      secondId = published.platos[1]._id;
+    const orderInput = {
+      menuId: published._id,
+      fecha: '2031-01-02',
+      cliente: 'Prueba',
+      telefono: '+56900000000',
+      total: 11000,
+      items: [
+        { platoId: firstId, nombre: regular.nombre, precio: 5500, cantidad: 2 },
+      ],
+    };
+    const requestId = '00000000-0000-4000-8000-000000000002';
+    const order = await body<{ _id: string }>(
+      http()
+        .post('/orders')
+        .set(api(customer))
+        .set('Idempotency-Key', requestId)
+        .send(orderInput),
+      201,
+    );
+    const input = {
+      expectedUpdatedAt: published.updatedAt,
+      precioBase: 5500,
+      platos: [
+        {
+          id: firstId,
+          catalogoId: String(regular._id),
+          stock: 12,
+          expectedStock: 8,
+          precioEspecial: 5900,
+          opcionesProteina: [],
+        },
+        { catalogoId: String(added._id), stock: 0, precioEspecial: null },
+      ],
+    };
+    await http()
+      .patch(`/menu/${published._id}/publication`)
+      .set(api(kitchen))
+      .send(input)
+      .expect(403);
+    let edited = await body<SavedMenu>(
+      http()
+        .patch(`/menu/${published._id}/publication`)
+        .set(api(admin))
+        .send(input),
+    );
+    expect(edited.platos.find((p) => p._id === firstId)).toMatchObject({
+      stock: 12,
+      precio: 5900,
+      nombre: regular.nombre,
+    });
+    expect(edited.platos.find((p) => p._id === secondId)).toMatchObject({
+      retirado: true,
+      stock: 5,
+    });
+    const newId = edited.platos.find(
+      (p) => p.catalogoId === String(added._id),
+    )!._id;
+    const [visible] = await body<SavedMenu[]>(http().get('/menu/2031-01-02'));
+    expect(visible.platos).toHaveLength(2);
+    expect(visible.platos.some((p) => p._id === secondId)).toBe(false);
+    const recorded = await body<
+      { _id: string; items: { nombre: string; precio: number }[] }[]
+    >(http().get('/orders').set(api(admin)));
+    expect(recorded.find((p) => p._id === order._id)!.items[0]).toMatchObject({
+      nombre: regular.nombre,
+      precio: 5500,
+    });
+    await http()
+      .post('/orders')
+      .set(api(customer))
+      .set('Idempotency-Key', '00000000-0000-4000-8000-000000000003')
+      .send({
+        ...orderInput,
+        items: [
+          {
+            platoId: secondId,
+            nombre: second.nombre,
+            precio: 5500,
+            cantidad: 1,
+          },
+        ],
+      })
+      .expect(400);
+    await dishes.updateOne({ _id: firstId }, { $inc: { stock: -1 } });
+    await http()
+      .patch(`/menu/${published._id}/publication`)
+      .set(api(admin))
+      .send({
+        ...input,
+        expectedUpdatedAt: edited.updatedAt,
+        platos: [{ ...input.platos[0], stock: 20, expectedStock: 12 }],
+      })
+      .expect(409);
+    expect((await dishes.findById(firstId))!.stock).toBe(11);
+    const pricesOnly = {
+      expectedUpdatedAt: edited.updatedAt,
+      precioBase: 6500,
+      platos: [
+        { id: firstId, precioEspecial: 6000 },
+        { id: newId, precioEspecial: null },
+      ],
+    };
+    edited = await body<SavedMenu>(
+      http()
+        .patch(`/menu/${published._id}/publication`)
+        .set(api(admin))
+        .send(pricesOnly),
+    );
+    expect(edited.platos.find((p) => p._id === firstId)).toMatchObject({
+      stock: 11,
+      precio: 6000,
+    });
+    expect(edited.platos.find((p) => p._id === newId)!.precio).toBe(6500);
+    await http()
+      .patch(`/menu/${published._id}/publication`)
+      .set(api(admin))
+      .send(pricesOnly)
+      .expect(409);
+    await http().delete(`/dishes/${firstId}`).set(api(admin)).expect(409);
+    await http().delete(`/menu/${published._id}`).set(api(admin)).expect(409);
+    const removeOrdered = {
+      expectedUpdatedAt: edited.updatedAt,
+      precioBase: 6500,
+      platos: [{ id: newId, precioEspecial: null }],
+    };
+    await http()
+      .patch(`/menu/${published._id}/publication`)
+      .set(api(admin))
+      .send(removeOrdered)
+      .expect(409);
+    expect((await dishes.findById(firstId))!.retirado).toBe(false);
+    edited = await body<SavedMenu>(
+      http()
+        .patch(`/menu/${published._id}/publication`)
+        .set(api(admin))
+        .send({
+          expectedUpdatedAt: edited.updatedAt,
+          precioBase: 6500,
+          platos: [
+            { id: firstId, stock: 0, expectedStock: 11, precioEspecial: null },
+            { id: newId, precioEspecial: null },
+          ],
+        }),
+    );
+    expect(edited.platos.find((p) => p._id === firstId)).toMatchObject({
+      stock: 0,
+      retirado: false,
+      tienePedidos: true,
+    });
+    const [adminMenu] = await body<SavedMenu[]>(
+      http().get('/menu/admin?fecha=2031-01-02').set(api(admin)),
+    );
+    expect(adminMenu.platos.find((p) => p._id === firstId)!.tienePedidos).toBe(
+      true,
+    );
+    await http()
+      .patch(`/orders/${order._id}/cancel`)
+      .set(api(admin))
+      .expect(200);
+    await http()
+      .patch(`/menu/${published._id}/publication`)
+      .set(api(admin))
+      .send({ ...removeOrdered, expectedUpdatedAt: edited.updatedAt })
+      .expect(409);
+    edited = await body<SavedMenu>(
+      http()
+        .patch(`/menu/${published._id}/publication`)
+        .set(api(admin))
+        .send({
+          expectedUpdatedAt: edited.updatedAt,
+          precioBase: 6500,
+          platos: [
+            { id: firstId, stock: 3, expectedStock: 2, precioEspecial: null },
+            { id: newId, precioEspecial: null },
+          ],
+        }),
+    );
+    expect(await dishes.countDocuments({ menuId: published._id })).toBe(3);
+    jest.mocked(orderingHours.isOrderingOpen).mockReturnValue(false);
+    await http()
+      .post('/orders')
+      .set(api(customer))
+      .set('Idempotency-Key', requestId)
+      .send(orderInput)
+      .expect(201);
+    await http()
+      .post('/orders')
+      .set(api(customer))
+      .set('Idempotency-Key', '00000000-0000-4000-8000-000000000004')
+      .send(orderInput)
+      .expect(403);
+    expect((await dishes.findById(firstId))!.stock).toBe(3);
+    jest.mocked(orderingHours.isOrderingOpen).mockReturnValue(true);
   });
 });

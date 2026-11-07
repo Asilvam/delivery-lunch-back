@@ -1,3 +1,4 @@
+import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
@@ -8,7 +9,10 @@ import { Dish, DishSchema } from './schemas/dish.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Dish.name, schema: DishSchema }]),
+    MongooseModule.forFeature([
+      { name: Dish.name, schema: DishSchema },
+      { name: Order.name, schema: OrderSchema },
+    ]),
     AuthModule,
   ],
   controllers: [DishesController],
