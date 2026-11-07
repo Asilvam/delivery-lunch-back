@@ -180,9 +180,9 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pulpa',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794003999/delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-9f563e51e856.png',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794015249/delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-586cee3a962a.png',
     imagenPublicId:
-      'delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-9f563e51e856',
+      'delivery-lunch/biblioteca/pulpa-asada-arroz-papas-fritas-586cee3a962a',
     esHipo: false,
     opciones: [],
     activo: true,
@@ -194,8 +194,8 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pulpa',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004001/delivery-lunch/biblioteca/pulpa-asada-pure-bece92684ef5.png',
-    imagenPublicId: 'delivery-lunch/biblioteca/pulpa-asada-pure-bece92684ef5',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794014897/delivery-lunch/biblioteca/pulpa-asada-pure-28448c719c47.png',
+    imagenPublicId: 'delivery-lunch/biblioteca/pulpa-asada-pure-28448c719c47',
     esHipo: false,
     opciones: [],
     activo: true,
@@ -207,8 +207,8 @@ export const INITIAL_DISH_LIBRARY = [
     descripcion: '',
     categoria: 'Pulpa',
     imagenUrl:
-      'https://res.cloudinary.com/dsbpineil/image/upload/v1794004001/delivery-lunch/biblioteca/pulpa-asada-fideos-a78cd094b507.png',
-    imagenPublicId: 'delivery-lunch/biblioteca/pulpa-asada-fideos-a78cd094b507',
+      'https://res.cloudinary.com/dsbpineil/image/upload/v1794015247/delivery-lunch/biblioteca/pulpa-asada-fideos-ecc432356154.png',
+    imagenPublicId: 'delivery-lunch/biblioteca/pulpa-asada-fideos-ecc432356154',
     esHipo: false,
     opciones: [],
     activo: true,
