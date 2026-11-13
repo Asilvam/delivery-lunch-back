@@ -1,3 +1,5 @@
+import * as dates from '../common/utils/date.utils';
+import { OrderEligibilityService } from './services/order-eligibility.service';
 import * as orderingHours from '../common/utils/ordering-hours';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createConnection, Connection, Types } from 'mongoose';
@@ -26,6 +28,7 @@ describe('Local checkout transactions', () => {
   };
   const notify = jest.fn().mockResolvedValue(undefined);
   const emit = jest.fn();
+  const findMenu = jest.fn();
   const payload = (): CreateOrderDto => ({
     menuId,
     fecha: '2026-11-05',
@@ -51,7 +54,7 @@ describe('Local checkout transactions', () => {
       conn,
       new OrdersRepository(orderModel),
       {
-        findById: jest.fn().mockResolvedValue({ fecha: '2026-11-05' }),
+        findById: findMenu,
       } as unknown as MenuRepository,
       new DishesRepository(conn, orderModel, dishModel),
       { notifyOrder: notify } as unknown as WhatsappService,
@@ -59,11 +62,14 @@ describe('Local checkout transactions', () => {
         emitToAdmin: emit,
         emitToKitchen: jest.fn(),
       } as unknown as OrdersSseService,
+      new OrderEligibilityService(),
     );
     await orderModel.init();
   });
   beforeEach(async () => {
     jest.spyOn(orderingHours, 'isOrderingOpen').mockReturnValue(true);
+    jest.spyOn(dates, 'toIsoDate').mockReturnValue('2026-11-05');
+    findMenu.mockResolvedValue({ fecha: '2026-11-05', estado: 'publicado' });
     await conn.model(Order.name).deleteMany({});
     await conn.model<Dish>(Dish.name).deleteMany({});
     await conn.model<Dish>(Dish.name).create({
@@ -79,6 +85,7 @@ describe('Local checkout transactions', () => {
   afterAll(async () => {
     if (conn) await conn.close();
     if (mongo) await mongo.stop();
+    jest.restoreAllMocks();
   });
   it('uses the persisted dish price, records verified identity and deducts stock once', async () => {
     const key = randomUUID();
@@ -211,5 +218,48 @@ describe('Local checkout transactions', () => {
     expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
     expect(await conn.model(Order.name).countDocuments()).toBe(0);
     expect(notify).not.toHaveBeenCalled();
+  });
+  it.each([
+    { fecha: '2026-11-04', estado: 'publicado' },
+    { fecha: '2026-11-06', estado: 'publicado' },
+    { fecha: '2026-11-05', estado: 'borrador' },
+  ])('rejects ineligible menus before deducting stock: %j', async (menu) => {
+    findMenu.mockResolvedValue(menu);
+    await expect(
+      service.create(
+        { ...payload(), fecha: menu.fecha },
+        customer,
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
+    expect(await conn.model(Order.name).countDocuments()).toBe(0);
+    expect(notify).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+  });
+  it('recovers a recorded attempt after its date and window expire without a second stock deduction', async () => {
+    const key = randomUUID();
+    const first = await service.create(payload(), customer, key);
+    jest.mocked(dates.toIsoDate).mockReturnValue('2026-11-06');
+    jest.mocked(orderingHours.isOrderingOpen).mockReturnValue(false);
+    const recovered = await service.create(payload(), customer, key);
+    expect(recovered._id.toString()).toBe(first._id.toString());
+    expect(await conn.model(Order.name).countDocuments()).toBe(1);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+  it('rolls back stock if the calendar date changes before the order is saved', async () => {
+    jest
+      .mocked(dates.toIsoDate)
+      .mockReturnValueOnce('2026-11-05')
+      .mockReturnValue('2026-11-06');
+    await expect(
+      service.create(payload(), customer, randomUUID()),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'MENU_NOT_TODAY' },
+    });
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
+    expect(await conn.model(Order.name).countDocuments()).toBe(0);
   });
 });

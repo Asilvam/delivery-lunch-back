@@ -1,11 +1,10 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DateTime } from 'luxon';
+import { assertMenuDateNotPast } from './policies/menu-date.policy';
 import { toIsoDate } from '../common/utils/date.utils';
 import { Menu } from './schemas/menu.schema';
 import { MenuWithDishes } from './types/menu-with-dishes.type';
@@ -20,6 +19,7 @@ export class MenuService {
   constructor(private readonly menuRepository: MenuRepository) {}
 
   async create(createMenuDto: CreateMenuDto): Promise<Menu> {
+    assertMenuDateNotPast(createMenuDto.fecha);
     this.logger.log(`Creando menu para fecha: ${createMenuDto.fecha}`);
     const menu = await this.menuRepository.create(createMenuDto);
     this.logger.log(
@@ -84,8 +84,7 @@ export class MenuService {
       throw new NotFoundException(`No existe menu con id ${id}`);
     }
 
-    if (!DateTime.fromISO(fecha).isValid)
-      throw new BadRequestException('La fecha no es válida.');
+    assertMenuDateNotPast(fecha);
     let copied: MenuWithDishes | null;
     try {
       copied = await this.menuRepository.copy(id, fecha);

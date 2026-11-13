@@ -1,3 +1,4 @@
+import * as dates from '../common/utils/date.utils';
 import * as orderingHours from '../common/utils/ordering-hours';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -51,6 +52,7 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
   const api = (token: string) => ({ Authorization: `Bearer ${token}` });
   beforeAll(async () => {
     jest.spyOn(orderingHours, 'isOrderingOpen').mockReturnValue(true);
+    jest.spyOn(dates, 'toIsoDate').mockReturnValue('2030-11-06');
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     const module = await Test.createTestingModule({
       imports: [
@@ -336,6 +338,7 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
     expect(await menus.countDocuments({ fecha: input.fecha })).toBe(0);
   });
   it('edits a publication without losing stock, changing order snapshots or deleting referenced dishes', async () => {
+    jest.mocked(dates.toIsoDate).mockReturnValue('2031-01-02');
     const regular = (await library.findOne({ clave: 'porotos-con-riendas' }))!;
     const second = (await library.findOne({
       clave: 'pollo-krispy-arroz-papas-fritas',
@@ -556,5 +559,59 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
       .expect(403);
     expect((await dishes.findById(firstId))!.stock).toBe(3);
     jest.mocked(orderingHours.isOrderingOpen).mockReturnValue(true);
+  });
+  it('rejects past creation, publication and copy through every admin entry point while retaining historical reads', async () => {
+    jest.mocked(dates.toIsoDate).mockReturnValue('2030-11-06');
+    const past = '2030-11-05';
+    const composition = {
+      fecha: past,
+      precioBase: 5500,
+      ensalada: ['Ensalada'],
+      pan: 'Pan',
+      postre: ['Fruta'],
+      platos: [],
+    };
+    for (const estado of ['borrador', 'publicado']) {
+      await http()
+        .post('/menu/composition')
+        .set(api(admin))
+        .send({ ...composition, estado })
+        .expect(400);
+    }
+    await http()
+      .post('/menu')
+      .set(api(admin))
+      .send({
+        fecha: past,
+        ensalada: ['Ensalada'],
+        pan: 'Pan',
+        postre: ['Fruta'],
+      })
+      .expect(400);
+    const source = await body<SavedMenu[]>(http().get('/menu/2030-11-06'));
+    await http()
+      .post(`/menu/${source[0]._id}/copy?fecha=${past}`)
+      .set(api(admin))
+      .expect(400);
+    expect(await menus.countDocuments({ fecha: past })).toBe(0);
+    const historical = await menus.create({
+      fecha: past,
+      pan: 'Pan',
+      estado: 'borrador',
+    });
+    await http()
+      .patch(`/menu/${historical._id.toString()}/composition`)
+      .set(api(admin))
+      .send({
+        ...composition,
+        estado: 'publicado',
+        expectedUpdatedAt: historical.updatedAt.toISOString(),
+      })
+      .expect(400);
+    expect((await menus.findById(historical._id))!.estado).toBe('borrador');
+    const listed = await body<SavedMenu[]>(
+      http().get(`/menu/admin?fecha=${past}`).set(api(admin)),
+    );
+    expect(listed[0]._id).toBe(historical._id.toString());
   });
 });

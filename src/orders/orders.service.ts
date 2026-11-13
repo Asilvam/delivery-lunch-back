@@ -2,7 +2,6 @@ import { MENU_SALAD, MENU_DESSERT } from '../menu/constants/menu.constants';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -19,7 +18,7 @@ import { OrdersRepository } from './repositories/orders.repository';
 import { OrderDocument } from './schemas/order.schema';
 import { OrdersSseService } from './services/orders-sse.service';
 import { WhatsappService } from './services/whatsapp.service';
-import { isOrderingOpen } from '../common/utils/ordering-hours';
+import { OrderEligibilityService } from './services/order-eligibility.service';
 
 @Injectable()
 export class OrdersService {
@@ -32,15 +31,8 @@ export class OrdersService {
     private readonly dishesRepository: DishesRepository,
     private readonly whatsappService: WhatsappService,
     private readonly ordersSseService: OrdersSseService,
+    private readonly eligibility: OrderEligibilityService,
   ) {}
-
-  private ensureOrderingOpen() {
-    if (!isOrderingOpen())
-      throw new ForbiddenException({
-        code: 'ORDERING_CLOSED',
-        message: 'Los pedidos están disponibles de 08:00 a 16:00.',
-      });
-  }
 
   async create(
     dto: CreateOrderDto,
@@ -81,12 +73,8 @@ export class OrdersService {
           session,
         );
         if (existing) return { order: checkExisting(existing), created: false };
-        this.ensureOrderingOpen();
         const menu = await this.menuRepository.findById(dto.menuId, session);
-        if (!menu || menu.estado === 'borrador' || menu.fecha !== dto.fecha)
-          throw new BadRequestException(
-            'El menú ya no está disponible para esa fecha',
-          );
+        this.eligibility.assertCanOrder(menu, dto.fecha);
         const quantities = new Map<string, number>();
         for (const item of dto.items)
           quantities.set(
@@ -146,7 +134,7 @@ export class OrdersService {
           (sum, item) => sum + item.precio * item.cantidad,
           0,
         );
-        this.ensureOrderingOpen();
+        this.eligibility.assertCanOrder(menu, dto.fecha);
         const order = await this.ordersRepository.create(
           { ...dto, items, total },
           {

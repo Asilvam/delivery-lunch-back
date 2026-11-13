@@ -9,6 +9,7 @@ import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { Order, OrderSchema } from './schemas/order.schema';
 import { OrdersSseService } from './services/orders-sse.service';
+import { OrderEligibilityService } from './services/order-eligibility.service';
 import { WhatsappService } from './services/whatsapp.service';
 
 @Module({
@@ -21,6 +22,7 @@ import { WhatsappService } from './services/whatsapp.service';
   controllers: [OrdersController],
   providers: [
     OrdersService,
+    OrderEligibilityService,
     OrdersRepository,
     WhatsappService,
     OrdersSseService,
