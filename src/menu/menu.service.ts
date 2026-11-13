@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { assertMenuDateNotPast } from './policies/menu-date.policy';
+import { orderingDeadline } from '../common/utils/ordering-deadline';
 import { toIsoDate } from '../common/utils/date.utils';
 import { Menu } from './schemas/menu.schema';
 import { MenuWithDishes } from './types/menu-with-dishes.type';
@@ -42,7 +43,7 @@ export class MenuService {
       throw new NotFoundException(`No existe menu para la fecha ${fecha}`);
     }
 
-    return [menu];
+    return [{ ...menu, venceEn: orderingDeadline(menu.fecha) }];
   }
 
   async update(id: string, updateMenuDto: UpdateMenuDto): Promise<Menu> {

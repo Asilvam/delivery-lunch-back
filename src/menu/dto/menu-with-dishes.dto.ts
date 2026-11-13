@@ -10,6 +10,13 @@ export class MenuWithDishesDto {
   @ApiProperty({ example: '2026-04-21' })
   fecha: string;
 
+  @ApiProperty({
+    description: 'Vencimiento para nuevos pedidos en formato ISO UTC',
+    example: '2026-11-13T19:00:00.000Z',
+    required: false,
+  })
+  venceEn?: string;
+
   @ApiProperty({ type: [String], example: ['César', 'Chilena'] })
   ensalada: string[];
 
@@ -26,8 +33,8 @@ export class MenuWithDishesDto {
         nombre: 'Pollo asado',
         precio: 4800,
         stock: 10,
-      }
-    ]
+      },
+    ],
   })
   platos: any[];
 

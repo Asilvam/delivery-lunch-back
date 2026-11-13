@@ -22,6 +22,7 @@ import { Menu, MenuDocument } from './schemas/menu.schema';
 import { Dish, DishDocument } from '../dishes/schemas/dish.schema';
 
 interface SavedMenu {
+  venceEn?: string;
   _id: string;
   estado: string;
   updatedAt: string;
@@ -241,6 +242,7 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
       .send({ nombre: 'Nombre nuevo para futuros menús' })
       .expect(200);
     const [unchanged] = await body<SavedMenu[]>(http().get('/menu/2030-11-06'));
+    expect(unchanged.venceEn).toBe('2030-11-06T19:00:00.000Z');
     expect(unchanged.platos[0].nombre).toBe(originalName);
     expect(unchanged.platos[0].descripcion).toBe('Descripción personalizada');
     await http()
