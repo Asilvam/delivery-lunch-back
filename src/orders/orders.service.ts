@@ -1,3 +1,4 @@
+import { CustomersService } from '../customers/customers.service';
 import { MENU_SALAD, MENU_DESSERT } from '../menu/constants/menu.constants';
 import {
   BadRequestException,
@@ -32,11 +33,12 @@ export class OrdersService {
     private readonly whatsappService: WhatsappService,
     private readonly ordersSseService: OrdersSseService,
     private readonly eligibility: OrderEligibilityService,
+    private readonly customers: CustomersService,
   ) {}
 
   async create(
     dto: CreateOrderDto,
-    customer: { googleId: string; email: string },
+    customer: { googleId: string; email: string; authVersion?: number },
     requestId: string,
   ): Promise<OrderDocument> {
     const fingerprint = createHash('sha256')
@@ -73,6 +75,13 @@ export class OrdersService {
           session,
         );
         if (existing) return { order: checkExisting(existing), created: false };
+        await this.customers.recordOrder(
+          customer.googleId,
+          customer.authVersion ?? 0,
+          dto.cliente,
+          dto.telefono,
+          session,
+        );
         const menu = await this.menuRepository.findById(dto.menuId, session);
         this.eligibility.assertCanOrder(menu, dto.fecha);
         const quantities = new Map<string, number>();

@@ -4,24 +4,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 
 @Injectable()
 export class GoogleAuthService {
   private readonly client = new OAuth2Client();
-  constructor(
-    private readonly config: ConfigService,
-    private readonly jwt: JwtService,
-  ) {}
+  constructor(private readonly config: ConfigService) {}
 
-  async login(credential: string) {
+  async verify(credential: string) {
     const audience = this.config.get<string>('GOOGLE_CLIENT_ID');
     if (!audience)
       throw new ServiceUnavailableException(
         'El acceso con Google no está configurado',
       );
-    let payload;
+    let payload: TokenPayload | undefined;
     try {
       const ticket = await this.client.verifyIdToken({
         idToken: credential,
@@ -38,22 +34,10 @@ export class GoogleAuthService {
         'Se requiere una cuenta de Google con correo verificado',
       );
     }
-    const customer = {
+    return {
       googleId: payload.sub,
       name: payload.name || payload.email,
       email: payload.email,
-    };
-    return {
-      access_token: this.jwt.sign(
-        {
-          sub: customer.googleId,
-          role: 'customer',
-          name: customer.name,
-          email: customer.email,
-        },
-        { expiresIn: '1h' },
-      ),
-      customer,
     };
   }
 }

@@ -1,3 +1,5 @@
+import { CustomersService } from '../src/customers/customers.service';
+import { CustomerSessionService } from '../src/auth/customer-session.service';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -38,6 +40,14 @@ describe('Customer route protection', () => {
       controllers: [OrdersController],
       providers: [
         JwtStrategy,
+        {
+          provide: CustomersService,
+          useValue: { active: jest.fn().mockResolvedValue({}) },
+        },
+        {
+          provide: CustomerSessionService,
+          useValue: { validateAccess: jest.fn().mockResolvedValue(undefined) },
+        },
         JwtAuthGuard,
         RolesGuard,
         {
@@ -79,7 +89,7 @@ describe('Customer route protection', () => {
       .post('/orders')
       .set(
         'Authorization',
-        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer' }, { expiresIn: -1 })}`,
+        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', sid: '000000000000000000000003' }, { expiresIn: -1 })}`,
       )
       .send(input)
       .expect(401));
@@ -88,7 +98,7 @@ describe('Customer route protection', () => {
       .post('/orders')
       .set(
         'Authorization',
-        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', email: 'c@example.test' })}`,
+        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', sid: '000000000000000000000003', email: 'c@example.test' })}`,
       )
       .send(input)
       .expect(400));
@@ -98,14 +108,14 @@ describe('Customer route protection', () => {
       .post('/orders')
       .set(
         'Authorization',
-        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', email: 'c@example.test' })}`,
+        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', sid: '000000000000000000000003', email: 'c@example.test' })}`,
       )
       .set('Idempotency-Key', key)
       .send(input)
       .expect(201);
     expect(create).toHaveBeenCalledWith(
       input,
-      { googleId: 'google-user', email: 'c@example.test' },
+      { googleId: 'google-user', email: 'c@example.test', authVersion: 0 },
       key,
     );
   });
@@ -114,7 +124,7 @@ describe('Customer route protection', () => {
       .post('/orders')
       .set(
         'Authorization',
-        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer' })}`,
+        `Bearer ${jwt.sign({ sub: 'google-user', role: 'customer', sid: '000000000000000000000003' })}`,
       )
       .set('Idempotency-Key', randomUUID())
       .send({ ...input, customerGoogleId: 'someone-else' })

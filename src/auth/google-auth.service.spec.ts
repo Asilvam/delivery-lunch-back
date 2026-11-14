@@ -1,16 +1,13 @@
 import { GoogleAuthService } from './google-auth.service';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 
 describe('Google customer authentication', () => {
-  const jwt = new JwtService({ secret: 'test-only-secret' });
   const service = new GoogleAuthService(
     new ConfigService({ GOOGLE_CLIENT_ID: 'test-client' }),
-    jwt,
   );
   afterEach(() => jest.restoreAllMocks());
-  it('verifies the audience and creates only a customer session', async () => {
+  it('verifies the audience and returns only a verified customer identity', async () => {
     const verify = jest
       .spyOn(OAuth2Client.prototype, 'verifyIdToken')
       .mockResolvedValue({
@@ -21,38 +18,34 @@ describe('Google customer authentication', () => {
           name: 'Cliente',
         }),
       } as never);
-    const result = await service.login('test-google-credential');
+    const result = await service.verify('test-google-credential');
     expect(verify).toHaveBeenCalledWith({
       idToken: 'test-google-credential',
       audience: 'test-client',
     });
-    expect(jwt.verify(result.access_token)).toMatchObject({
-      sub: 'google-user',
-      role: 'customer',
+    expect(result).toEqual({
+      googleId: 'google-user',
+      name: 'Cliente',
+      email: 'customer@example.test',
     });
-    expect(
-      jwt.verify(result.access_token).exp - jwt.verify(result.access_token).iat,
-    ).toBe(3600);
   });
   it('rejects invalid Google credentials', async () => {
     jest
       .spyOn(OAuth2Client.prototype, 'verifyIdToken')
       .mockRejectedValue(new Error('invalid'));
-    await expect(service.login('invalid')).rejects.toMatchObject({
+    await expect(service.verify('invalid')).rejects.toMatchObject({
       status: 401,
     });
   });
   it('rejects an unverified email', async () => {
-    jest
-      .spyOn(OAuth2Client.prototype, 'verifyIdToken')
-      .mockResolvedValue({
-        getPayload: () => ({
-          sub: 'user',
-          email: 'x@example.test',
-          email_verified: false,
-        }),
-      } as never);
-    await expect(service.login('credential')).rejects.toMatchObject({
+    jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      getPayload: () => ({
+        sub: 'user',
+        email: 'x@example.test',
+        email_verified: false,
+      }),
+    } as never);
+    await expect(service.verify('credential')).rejects.toMatchObject({
       status: 401,
     });
   });

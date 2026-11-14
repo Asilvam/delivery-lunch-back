@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { assertMenuDateNotPast } from './policies/menu-date.policy';
+import { assertCreatableMenuDate } from './policies/menu-date.policy';
 import { orderingDeadline } from '../common/utils/ordering-deadline';
 import { toIsoDate } from '../common/utils/date.utils';
 import { Menu } from './schemas/menu.schema';
@@ -20,7 +20,7 @@ export class MenuService {
   constructor(private readonly menuRepository: MenuRepository) {}
 
   async create(createMenuDto: CreateMenuDto): Promise<Menu> {
-    assertMenuDateNotPast(createMenuDto.fecha);
+    assertCreatableMenuDate(createMenuDto.fecha);
     this.logger.log(`Creando menu para fecha: ${createMenuDto.fecha}`);
     const menu = await this.menuRepository.create(createMenuDto);
     this.logger.log(
@@ -85,7 +85,7 @@ export class MenuService {
       throw new NotFoundException(`No existe menu con id ${id}`);
     }
 
-    assertMenuDateNotPast(fecha);
+    assertCreatableMenuDate(fecha);
     let copied: MenuWithDishes | null;
     try {
       copied = await this.menuRepository.copy(id, fecha);

@@ -1,3 +1,4 @@
+import { CustomerAdminModule } from './customers/customer-admin.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -26,6 +27,7 @@ import { UploadModule } from './upload/upload.module';
       }),
     }),
     AuthModule,
+    CustomerAdminModule,
     DishesModule,
     MenuModule,
     OrdersModule,

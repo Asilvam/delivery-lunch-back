@@ -1,3 +1,11 @@
+import { MongooseModule } from '@nestjs/mongoose';
+import { CustomersModule } from '../customers/customers.module';
+import { CustomerAuthController } from './customer-auth.controller';
+import { CustomerSessionService } from './customer-session.service';
+import {
+  CustomerSessionRecord,
+  CustomerSessionSchema,
+} from './customer-session.schema';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
@@ -13,6 +21,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 @Module({
   imports: [
     PassportModule,
+    CustomersModule,
+    MongooseModule.forFeature([
+      { name: CustomerSessionRecord.name, schema: CustomerSessionSchema },
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -27,9 +39,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, CustomerAuthController],
   providers: [
     AuthService,
+    CustomerSessionService,
     GoogleAuthService,
     JwtStrategy,
     JwtAuthGuard,

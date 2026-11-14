@@ -54,7 +54,10 @@ export class OrdersController {
   async create(
     @Body() createOrderDto: CreateOrderDto,
     @Headers('idempotency-key') requestId: string,
-    @Req() req: Request & { user: { username: string; email: string } },
+    @Req()
+    req: Request & {
+      user: { username: string; email: string; authVersion?: number };
+    },
   ) {
     if (!requestId || !isUUID(requestId, '4'))
       throw new BadRequestException('Idempotency-Key debe ser un UUID v4');
@@ -63,7 +66,11 @@ export class OrdersController {
     );
     return this.ordersService.create(
       createOrderDto,
-      { googleId: req.user.username, email: req.user.email },
+      {
+        googleId: req.user.username,
+        email: req.user.email,
+        authVersion: req.user.authVersion,
+      },
       requestId,
     );
   }
@@ -121,7 +128,7 @@ export class OrdersController {
               subscriber.next({
                 type: 'new_order',
                 data: JSON.stringify(o.toObject()),
-              } as MessageEvent);
+              });
             }
             subscriber.complete();
           })
@@ -166,7 +173,7 @@ export class OrdersController {
               subscriber.next({
                 type: 'order_validated',
                 data: JSON.stringify(o.toObject()),
-              } as MessageEvent);
+              });
             }
             subscriber.complete();
           })

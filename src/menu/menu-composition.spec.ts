@@ -1,3 +1,4 @@
+import { CustomerSessionService } from '../auth/customer-session.service';
 import * as dates from '../common/utils/date.utils';
 import * as orderingHours from '../common/utils/ordering-hours';
 import { Test } from '@nestjs/testing';
@@ -53,6 +54,7 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
   const api = (token: string) => ({ Authorization: `Bearer ${token}` });
   beforeAll(async () => {
     jest.spyOn(orderingHours, 'isOrderingOpen').mockReturnValue(true);
+    jest.spyOn(orderingHours, 'hasOrderingClosed').mockReturnValue(false);
     jest.spyOn(dates, 'toIsoDate').mockReturnValue('2030-11-06');
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     const module = await Test.createTestingModule({
@@ -95,11 +97,13 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
     await app.init();
     const jwt = app.get(JwtService);
     admin = jwt.sign({ sub: 'admin', role: 'admin' });
-    customer = jwt.sign({
-      sub: 'test-customer',
-      role: 'customer',
-      email: 'customer@example.test',
-    });
+    customer = (
+      await app.get(CustomerSessionService).create({
+        googleId: 'test-customer',
+        name: 'Cliente',
+        email: 'customer@example.test',
+      })
+    ).access_token;
     kitchen = jwt.sign({ sub: 'kitchen', role: 'kitchen' });
     library = app.get(getModelToken(LibraryDish.name));
     menus = app.get(getModelToken(Menu.name));
@@ -615,5 +619,39 @@ describe('Dish library and daily menu flow (isolated MongoDB)', () => {
       http().get(`/menu/admin?fecha=${past}`).set(api(admin)),
     );
     expect(listed[0]._id).toBe(historical._id.toString());
+  });
+  it('rejects creating or publishing today after closing and permits a future menu', async () => {
+    jest.mocked(orderingHours.hasOrderingClosed).mockReturnValue(true);
+    const input = {
+      fecha: '2030-11-06',
+      ensalada: ['Ensalada'],
+      pan: 'Pan',
+      postre: ['Fruta'],
+    };
+    try {
+      for (const estado of ['borrador', 'publicado']) {
+        const response = await http()
+          .post('/menu/composition')
+          .set(api(admin))
+          .send({ ...input, precioBase: 5500, platos: [], estado })
+          .expect(400);
+        expect((response.body as { code: string }).code).toBe(
+          'MENU_DATE_CLOSED',
+        );
+      }
+      await http().post('/menu').set(api(admin)).send(input).expect(400);
+      const [source] = await body<SavedMenu[]>(http().get('/menu/2030-11-06'));
+      await http()
+        .post(`/menu/${source._id}/copy?fecha=2030-11-06`)
+        .set(api(admin))
+        .expect(400);
+      await http()
+        .post('/menu')
+        .set(api(admin))
+        .send({ ...input, fecha: '2030-11-30' })
+        .expect(201);
+    } finally {
+      jest.mocked(orderingHours.hasOrderingClosed).mockReturnValue(false);
+    }
   });
 });

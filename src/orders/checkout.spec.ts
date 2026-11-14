@@ -1,3 +1,5 @@
+import { Customer, CustomerSchema } from '../customers/customer.schema';
+import { CustomersService } from '../customers/customers.service';
 import * as dates from '../common/utils/date.utils';
 import { OrderEligibilityService } from './services/order-eligibility.service';
 import * as orderingHours from '../common/utils/ordering-hours';
@@ -20,6 +22,7 @@ describe('Local checkout transactions', () => {
   let mongo: MongoMemoryReplSet;
   let conn: Connection;
   let service: OrdersService;
+  let customers: CustomersService;
   const menuId = new Types.ObjectId().toString();
   const dishId = new Types.ObjectId().toString();
   const customer = {
@@ -50,6 +53,10 @@ describe('Local checkout transactions', () => {
     conn = await createConnection(mongo.getUri()).asPromise();
     const orderModel = conn.model(Order.name, OrderSchema);
     const dishModel = conn.model(Dish.name, DishSchema);
+    customers = new CustomersService(
+      conn.model(Customer.name, CustomerSchema),
+      orderModel,
+    );
     service = new OrdersService(
       conn,
       new OrdersRepository(orderModel),
@@ -63,6 +70,7 @@ describe('Local checkout transactions', () => {
         emitToKitchen: jest.fn(),
       } as unknown as OrdersSseService,
       new OrderEligibilityService(),
+      customers,
     );
     await orderModel.init();
   });
@@ -71,6 +79,8 @@ describe('Local checkout transactions', () => {
     jest.spyOn(dates, 'toIsoDate').mockReturnValue('2026-11-05');
     findMenu.mockResolvedValue({ fecha: '2026-11-05', estado: 'publicado' });
     await conn.model(Order.name).deleteMany({});
+    await conn.model(Customer.name).deleteMany({});
+    await customers.register({ ...customer, name: 'Cliente' });
     await conn.model<Dish>(Dish.name).deleteMany({});
     await conn.model<Dish>(Dish.name).create({
       _id: dishId,
@@ -98,6 +108,65 @@ describe('Local checkout transactions', () => {
     expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledTimes(1);
+  });
+  it('blocks new orders even with an already issued identity, preserving previous orders and stock', async () => {
+    const first = await service.create(payload(), customer, randomUUID());
+    await customers.setBlocked(
+      customer.googleId,
+      { blocked: true, reason: 'Prueba local' },
+      'admin',
+    );
+    await expect(
+      service.create(payload(), customer, randomUUID()),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(await conn.model(Order.name).countDocuments()).toBe(1);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
+    expect(first.validadoPorAdmin).toBe(false);
+    await customers.setBlocked(customer.googleId, { blocked: false }, 'admin');
+    // Unblocking does not revive an older session version.
+    await expect(
+      service.create(payload(), customer, randomUUID()),
+    ).rejects.toMatchObject({ status: 403 });
+    const current = await customers.active(customer.googleId);
+    await service.create(
+      payload(),
+      { ...customer, authVersion: current.authVersion },
+      randomUUID(),
+    );
+    expect(
+      await conn.model(Order.name).countDocuments({ validadoPorAdmin: true }),
+    ).toBe(0);
+  });
+  it('rechecks a block arriving while order creation is already in flight', async () => {
+    let entered!: () => void, release!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original: CustomersService['recordOrder'] =
+      customers.recordOrder.bind(customers) as CustomersService['recordOrder'];
+    const record = jest
+      .spyOn(customers, 'recordOrder')
+      .mockImplementationOnce(async (...args) => {
+        entered();
+        await gate;
+        return original(...args);
+      });
+    const pending = service.create(payload(), customer, randomUUID());
+    await reached;
+    await customers.setBlocked(customer.googleId, { blocked: true }, 'admin');
+    release();
+    try {
+      await expect(pending).rejects.toMatchObject({ status: 403 });
+      expect(await conn.model(Order.name).countDocuments()).toBe(0);
+      expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(
+        3,
+      );
+    } finally {
+      record.mockRestore();
+    }
   });
   it('rejects a stale or spoofed price without deducting stock or placing an order', async () => {
     const input = payload();

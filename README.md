@@ -218,8 +218,12 @@ Si abres el frontend por `http://127.0.0.1:5173`, autoriza también ese origen.
 No copies `GOOGLE_CLIENT_SECRET` al frontend. El acceso usa Google Identity Services
 con ID tokens, por lo que solo necesita `GOOGLE_CLIENT_ID` en el backend.
 
-`POST /auth/google` valida el ID token de Google y devuelve una sesión de cliente
-con duración de una hora. `POST /orders` requiere ese JWT con rol `customer` y
+`POST /auth/google` valida el ID token de Google, registra su identidad y devuelve
+un JWT de cliente de 15 minutos. La sesión recordada dura como máximo 30 días,
+con un token opaco en cookie HttpOnly (`Secure` en producción, `SameSite=Lax`);
+MongoDB guarda solo su hash. `POST /auth/refresh` renueva el JWT sin abrir Google
+y sin prolongar esos 30 días. `POST /auth/logout` revoca la sesión del dispositivo,
+incluidos los accesos ya emitidos. `POST /orders` requiere ese JWT con rol `customer` y
 un header `Idempotency-Key` UUID v4. Admin y cocina mantienen su login separado;
 no pueden crear pedidos usando sus tokens de personal.
 
@@ -228,6 +232,32 @@ sessionStorage. Ante un envío de resultado incierto, reintenta exactamente el m
 pedido y key. La API evita duplicados mediante índice único por cuenta y key,
 reserva el stock y crea el pedido dentro de una transacción; usa el precio guardado de cada plato y calcula el total según la cantidad. Si el precio cambió desde la carga del carrito, rechaza el envío con `409 PRICE_CHANGED` para que el cliente revise el nuevo total. Para usar una base persistente con `npm run start:dev`,
 MongoDB debe estar configurado como replica set; el modo standalone no admite estas transacciones.
+
+### Sesión recordada y Clientes
+
+El navegador usa `/api/auth/google`, `/api/auth/refresh` y `/api/auth/logout` en el
+mismo origen del frontend. Vite reenvía estas rutas a `VITE_API_BASE_URL`; en
+Cloudflare Pages la función `functions/api/auth/[[path]].ts` usa `BACKEND_ORIGIN`
+(o `VITE_API_BASE_URL`) como origen HTTPS del backend. No se envían cookies del
+personal. El backend exige `X-Customer-Request: 1` y un `Origin` incluido en
+`CUSTOMER_WEB_ORIGINS`. En producción esta lista debe configurarse explícitamente,
+por ejemplo `https://sabores.serviciosasm.cl`; en desarrollo se permiten localhost
+5173/5175 si la variable no está definida. No hace falta habilitar cookies de
+terceros ni cambiar el login de administrador/cocina. El access token de cliente
+se mantiene en memoria, no en localStorage ni sessionStorage. Tras actualizar,
+las sesiones antiguas de una hora requieren entrar una vez con Google.
+
+**Admin → Clientes** permite buscar por nombre, correo o teléfono, consultar
+cantidad de pedidos/aprobados y última compra, bloquear y rehabilitar. Incluye los
+pedidos anteriores que tengan `customerGoogleId`, sin deducir identidad por nombre
+o teléfono ni modificar sus datos. Los registros sin identidad Google quedan fuera.
+Nombre de contacto y teléfono se guardan al crear un pedido válido y se ofrecen al
+cliente al volver a identificarse. El bloqueo exige confirmación, admite motivo
+interno e invalida todas las sesiones anteriores; rehabilitar exige iniciar sesión
+otra vez. Los pedidos registrados siguen su curso y se conservan. Todos los pedidos
+nuevos siguen requiriendo aprobación manual. La comprobación de cuenta habilitada
+comparte transacción con la reserva de stock y la creación del pedido para evitar
+que un bloqueo simultáneo deje pasar un nuevo envío.
 
 Pruebas locales aisladas:
 

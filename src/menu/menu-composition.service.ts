@@ -14,7 +14,7 @@ import {
 } from '../dish-library/dish-library.schema';
 import { DishLibraryService } from '../dish-library/dish-library.service';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
-import { assertMenuDateNotPast } from './policies/menu-date.policy';
+import { assertCreatableMenuDate } from './policies/menu-date.policy';
 import { MenuCompositionDto } from './dto/menu-composition.dto';
 
 export interface AdminMenuData {
@@ -80,7 +80,7 @@ export class MenuCompositionService {
   }
 
   async save(input: MenuCompositionDto, id?: string) {
-    assertMenuDateNotPast(input.fecha);
+    assertCreatableMenuDate(input.fecha);
     if (input.estado === 'publicado' && !input.platos.length)
       throw new BadRequestException(
         'Selecciona al menos un plato para publicar.',
@@ -169,7 +169,7 @@ export class MenuCompositionService {
         });
         const { fecha, precioBase, estado, ensalada, pan, postre } = input;
         const values = { fecha, precioBase, estado, ensalada, pan, postre };
-        assertMenuDateNotPast(input.fecha);
+        assertCreatableMenuDate(input.fecha);
         const menu = existing
           ? await this.menus.findOneAndUpdate(
               {

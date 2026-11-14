@@ -1,3 +1,7 @@
+import { MenuCompositionService } from '../src/menu/menu-composition.service';
+import { MenuPublicationService } from '../src/menu/menu-publication.service';
+import { CustomersService } from '../src/customers/customers.service';
+import { CustomerSessionService } from '../src/auth/customer-session.service';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +30,14 @@ describe('Menu pricing route protection', () => {
       controllers: [MenuController],
       providers: [
         JwtStrategy,
+        {
+          provide: CustomersService,
+          useValue: { active: jest.fn().mockResolvedValue({}) },
+        },
+        {
+          provide: CustomerSessionService,
+          useValue: { validateAccess: jest.fn().mockResolvedValue(undefined) },
+        },
         JwtAuthGuard,
         RolesGuard,
         {
@@ -33,6 +45,8 @@ describe('Menu pricing route protection', () => {
           useValue: new ConfigService({ JWT_SECRET: 'test-secret' }),
         },
         { provide: MenuService, useValue: {} },
+        { provide: MenuCompositionService, useValue: {} },
+        { provide: MenuPublicationService, useValue: {} },
         { provide: MenuPricingService, useValue: { update } },
       ],
     }).compile();
@@ -53,7 +67,10 @@ describe('Menu pricing route protection', () => {
   const patch = (role: string) =>
     request(app.getHttpServer())
       .patch(`/menu/${id}/prices`)
-      .set('Authorization', `Bearer ${jwt.sign({ sub: role, role })}`);
+      .set(
+        'Authorization',
+        `Bearer ${jwt.sign({ sub: role, role, sid: '000000000000000000000003' })}`,
+      );
   it('rejects anonymous access', () =>
     request(app.getHttpServer())
       .patch(`/menu/${id}/prices`)

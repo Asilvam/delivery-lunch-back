@@ -1,3 +1,4 @@
+import { CustomersModule } from '../customers/customers.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
@@ -18,6 +19,7 @@ import { WhatsappService } from './services/whatsapp.service';
     DishesModule, // exporta DishesRepository
     MenuModule, // exporta MenuService (y necesitamos MenuRepository)
     AuthModule,
+    CustomersModule,
   ],
   controllers: [OrdersController],
   providers: [
