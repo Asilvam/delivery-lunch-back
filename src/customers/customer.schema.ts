@@ -7,6 +7,7 @@ export class Customer {
   @Prop({ required: true }) name: string;
   @Prop({ required: true }) email: string;
   @Prop({ default: false }) blocked: boolean;
+  @Prop({ default: false }) deleted: boolean;
   @Prop({ default: '' }) blockReason: string;
   @Prop() blockedAt?: Date;
   @Prop() blockedBy?: string;

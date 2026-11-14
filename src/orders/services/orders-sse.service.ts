@@ -20,10 +20,11 @@ export class OrdersSseService implements OnModuleDestroy {
   /** Emite un evento al canal de administración */
   emitToAdmin(
     order: OrderDocument,
-    eventType: 'new_order' | 'order_cancelled' | 'order_validated',
+    eventType:
+      'new_order' | 'order_cancelled' | 'order_validated' | 'payment_update',
   ): void {
     this.logger.log(
-      `SSE→admin [${eventType}] — pedido: ${order._id}, cliente: "${order.cliente}"`,
+      `SSE→admin [${eventType}] — pedido: ${order._id.toString()}, cliente: "${order.cliente}"`,
     );
     this.adminSubject.next({
       type: eventType,
@@ -37,7 +38,7 @@ export class OrdersSseService implements OnModuleDestroy {
     eventType: 'order_validated' | 'status_update',
   ): void {
     this.logger.log(
-      `SSE→kitchen [${eventType}] — pedido: ${order._id}, cliente: "${order.cliente}"`,
+      `SSE→kitchen [${eventType}] — pedido: ${order._id.toString()}, cliente: "${order.cliente}"`,
     );
     this.kitchenSubject.next({
       type: eventType,

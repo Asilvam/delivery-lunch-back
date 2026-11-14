@@ -27,6 +27,8 @@ import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { SseOrderEvent, OrdersSseService } from './services/orders-sse.service';
 import { OrderStatus } from './constants/order.constants';
+import { RegisterPaymentDto } from './dto/register-payment.dto';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
 import { ApiTags, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
@@ -86,6 +88,23 @@ export class OrdersController {
   async findAllByAdminTrue() {
     this.logger.log(`GET /orders`);
     return this.ordersService.findAllByAdminTrue();
+  }
+
+  @Post('manual')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  createManual(
+    @Body() input: CreateOrderDto,
+    @Headers('idempotency-key') requestId: string,
+    @Req() req: { user: { username: string } },
+  ) {
+    if (!requestId || !isUUID(requestId, '4'))
+      throw new BadRequestException('Idempotency-Key debe ser un UUID v4');
+    return this.ordersService.create(
+      input,
+      { admin: req.user.username },
+      requestId,
+    );
   }
 
   /**
@@ -152,6 +171,7 @@ export class OrdersController {
    * Al conectar, replaya primero los pedidos aprobados pendientes en cocina.
    * Emite eventos:
    *   - order_validated: cuando el admin aprueba un pedido
+   *   - kitchen_snapshot_complete: termina la recuperación inicial (sin timbre)
    *   - status_update: cuando cambia el estado de un pedido
    */
   @Sse('stream/kitchen')
@@ -175,6 +195,8 @@ export class OrdersController {
                 data: JSON.stringify(o.toObject()),
               });
             }
+            // El cliente habilita el timbre solo después del historial inicial.
+            subscriber.next({ type: 'kitchen_snapshot_complete', data: '{}' });
             subscriber.complete();
           })
           .catch((err: unknown) => subscriber.error(err));
@@ -194,7 +216,7 @@ export class OrdersController {
   /**
    * PATCH /orders/:id/cancel  [requiere JWT + rol admin]
    * Cancela un pedido y restaura el stock de cada ítem.
-   * Solo se puede cancelar si el pedido está en estado pendiente o en_preparacion.
+   * Solo se puede cancelar antes de la entrega.
    */
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -202,6 +224,16 @@ export class OrdersController {
   async cancel(@Param('id') id: string) {
     this.logger.log(`PATCH /orders/${id}/cancel`);
     return this.ordersService.cancelOrder(id);
+  }
+
+  @Patch(':id/payment')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  registerPayment(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Body() input: RegisterPaymentDto,
+  ) {
+    return this.ordersService.registerPayment(id, input.medioPago);
   }
 
   /**
@@ -219,7 +251,7 @@ export class OrdersController {
   /**
    * PATCH /orders/:id/status  [requiere JWT + rol admin o kitchen]
    * Actualiza el estado de un pedido.
-   * Estados válidos: pendiente | en_preparacion | entregado | cancelado
+   * Avance: pendiente aprobado → en_preparacion → listo → entregado.
    */
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -8,7 +8,8 @@ import { createConnection, Connection, Types } from 'mongoose';
 import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { DishesRepository } from '../dishes/repositories/dishes.repository';
-import { Order, OrderSchema } from './schemas/order.schema';
+import { Order, OrderDocument, OrderSchema } from './schemas/order.schema';
+import { StatisticsService } from '../statistics/statistics.service';
 import { Dish, DishSchema } from '../dishes/schemas/dish.schema';
 import { MenuRepository } from '../menu/repositories/menu.repository';
 import { WhatsappService } from './services/whatsapp.service';
@@ -108,6 +109,129 @@ describe('Local checkout transactions', () => {
     expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledTimes(1);
+  });
+  it('creates a manual order without a Google profile and recovers retries without discounting stock twice', async () => {
+    const key = randomUUID();
+    const first = await service.create(payload(), { admin: 'admin' }, key);
+    const repeated = await service.create(payload(), { admin: 'admin' }, key);
+    expect(first).toMatchObject({
+      origen: 'manual',
+      creadoPorAdmin: 'admin',
+      validadoPorAdmin: false,
+      pagado: false,
+      total: 5000,
+    });
+    expect(first.customerGoogleId).toBeUndefined();
+    expect(String(repeated._id)).toBe(String(first._id));
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
+    expect(await conn.model(Customer.name).countDocuments()).toBe(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const changed = payload();
+    changed.cliente = 'Otro pedido';
+    await expect(
+      service.create(changed, { admin: 'admin' }, key),
+    ).rejects.toMatchObject({ status: 409 });
+    await service.create(payload(), customer, key);
+    expect(await conn.model(Order.name).countDocuments()).toBe(2);
+    await service.validateByAdmin(String(first._id));
+    expect(
+      (await conn.model<Order>(Order.name).findById(first._id))
+        .validadoPorAdmin,
+    ).toBe(true);
+  });
+  it('enforces the same hours, stock and current prices for manual orders', async () => {
+    const invalid = payload();
+    invalid.items[0].cantidad = 4;
+    await expect(
+      service.create(invalid, { admin: 'admin' }, randomUUID()),
+    ).rejects.toMatchObject({ status: 400 });
+    invalid.items[0].cantidad = 1;
+    invalid.items[0].precio = 1;
+    await expect(
+      service.create(invalid, { admin: 'admin' }, randomUUID()),
+    ).rejects.toMatchObject({ status: 409 });
+    jest.mocked(orderingHours.isOrderingOpen).mockReturnValue(false);
+    await expect(
+      service.create(payload(), { admin: 'admin' }, randomUUID()),
+    ).rejects.toMatchObject({ status: 403 });
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
+    expect(await conn.model(Order.name).countDocuments()).toBe(0);
+  });
+  it('records one full payment, preserves its date on retries and leaves cancellation independent', async () => {
+    const order = await service.create(payload(), customer, randomUUID());
+    expect(order.pagado).toBe(false);
+    const id = String(order._id);
+    const [first, repeated] = await Promise.all([
+      service.registerPayment(id, 'efectivo'),
+      service.registerPayment(id, 'efectivo'),
+    ]);
+    expect(first.pagado).toBe(true);
+    expect(first.total).toBe(5000);
+    expect(first.pagadoEn).toEqual(repeated.pagadoEn);
+    await expect(
+      service.registerPayment(id, 'transferencia'),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
+    await service.cancelOrder(id);
+    expect((await conn.model<Order>(Order.name).findById(id)).pagado).toBe(
+      true,
+    );
+    const another = await service.create(payload(), customer, randomUUID());
+    await service.cancelOrder(String(another._id));
+    await expect(
+      service.registerPayment(String(another._id), 'efectivo'),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+  it('separates money recorded by payment date from delivered unpaid and historical unregistered orders', async () => {
+    const base = {
+      menuId,
+      fecha: '2026-11-05',
+      cliente: 'Prueba',
+      telefono: '+56911111111',
+      items: [],
+      estado: OrderStatus.ENTREGADO,
+      createdAt: new Date('2026-11-05T15:00:00Z'),
+    };
+    await conn.model<Order>(Order.name).create([
+      {
+        ...base,
+        total: 11000,
+        pagado: true,
+        medioPago: 'efectivo',
+        createdAt: new Date('2026-11-04T15:00:00Z'),
+        pagadoEn: new Date('2026-11-05T16:00:00Z'),
+      },
+      {
+        ...base,
+        total: 5500,
+        estado: OrderStatus.CANCELADO,
+        pagado: true,
+        medioPago: 'transferencia',
+        pagadoEn: new Date('2026-11-05T16:00:00Z'),
+      },
+      { ...base, total: 5000, pagado: false },
+      { ...base, total: 3000 },
+      {
+        ...base,
+        total: 11000,
+        pagado: true,
+        medioPago: 'efectivo',
+        pagadoEn: new Date('2026-11-06T16:00:00Z'),
+      },
+    ]);
+    const stats = new StatisticsService(conn.model<OrderDocument>(Order.name));
+    const summary = await stats.getDashboardSummary('2026-11-05', '2026-11-05');
+    expect(summary.pagos).toEqual({
+      total: 16500,
+      efectivo: 11000,
+      transferencia: 5500,
+      porCobrar: 5000,
+      sinRegistro: 1,
+    });
+    expect(summary.ingresosTotales).toBe(19000);
+    expect(
+      (await conn.model<Order>(Order.name).findOne({ total: 3000 })).pagado,
+    ).toBeUndefined();
   });
   it('blocks new orders even with an already issued identity, preserving previous orders and stock', async () => {
     const first = await service.create(payload(), customer, randomUUID());
@@ -244,11 +368,45 @@ describe('Local checkout transactions', () => {
       service.updateStatus(id, { estado: OrderStatus.ENTREGADO }),
     ).rejects.toMatchObject({ status: 409 });
     await service.updateStatus(id, { estado: OrderStatus.EN_PREPARACION });
+    await expect(
+      service.updateStatus(id, { estado: OrderStatus.ENTREGADO }),
+    ).rejects.toMatchObject({ status: 409 });
+    const ready = await service.updateStatus(id, { estado: OrderStatus.LISTO });
+    const repeatedReady = await service.updateStatus(id, {
+      estado: OrderStatus.LISTO,
+    });
+    expect(ready.listoEn).toEqual(repeatedReady.listoEn);
+    const day = (order.get('createdAt') as Date).toLocaleDateString('en-CA', {
+      timeZone: 'America/Santiago',
+    });
+    const summary = await new StatisticsService(
+      conn.model<OrderDocument>(Order.name),
+    ).getDashboardSummary(day, day);
+    expect(summary.pedidosListos).toBe(1);
+    expect(summary.ingresosTotales).toBe(0);
+    const repo = new OrdersRepository(conn.model<OrderDocument>(Order.name));
+    expect(
+      (await repo.findPendingKitchen()).map((item) => item._id.toString()),
+    ).toContain(id);
     await service.updateStatus(id, { estado: OrderStatus.ENTREGADO });
     await expect(service.cancelOrder(id)).rejects.toMatchObject({
       status: 400,
     });
     expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(2);
+  });
+  it('cancels a ready order and restores all portions only once', async () => {
+    const order = await service.create(payload(), customer, randomUUID());
+    const id = order._id.toString();
+    await service.validateByAdmin(id);
+    await service.updateStatus(id, { estado: OrderStatus.EN_PREPARACION });
+    await service.updateStatus(id, { estado: OrderStatus.LISTO });
+    await Promise.all([service.cancelOrder(id), service.cancelOrder(id)]);
+    expect((await conn.model<Dish>(Dish.name).findById(dishId)).stock).toBe(3);
+    expect(
+      await new OrdersRepository(
+        conn.model<OrderDocument>(Order.name),
+      ).findPendingKitchen(),
+    ).toHaveLength(0);
   });
   it('requires protein only for the hypocaloric menu and rolls back invalid selections', async () => {
     await conn.model<Dish>(Dish.name).findByIdAndUpdate(dishId, {

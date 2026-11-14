@@ -30,6 +30,8 @@ export class Order {
   @Prop() customerEmail?: string;
   @Prop() requestId?: string;
   @Prop() requestFingerprint?: string;
+  @Prop({ type: String, enum: ['web', 'manual'] }) origen?: string;
+  @Prop() creadoPorAdmin?: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Menu', required: true })
   menuId: Types.ObjectId;
@@ -64,9 +66,15 @@ export class Order {
 
   @Prop({ type: Date })
   entregadoEn?: Date;
+  @Prop({ type: Date }) listoEn?: Date;
 
   @Prop({ type: Date })
   canceladoEn?: Date;
+  // Sin default: los pedidos anteriores mantienen el pago sin registrar.
+  @Prop({ type: Boolean }) pagado?: boolean;
+  @Prop({ type: String, enum: ['efectivo', 'transferencia'] })
+  medioPago?: string;
+  @Prop({ type: Date }) pagadoEn?: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
@@ -74,6 +82,16 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ estado: 1, createdAt: -1 });
 OrderSchema.index({ 'items.platoId': 1 });
+OrderSchema.index(
+  { requestId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      origen: 'manual',
+      requestId: { $type: 'string' },
+    },
+  },
+);
 
 OrderSchema.index(
   { customerGoogleId: 1, requestId: 1 },

@@ -25,7 +25,10 @@ interface DashboardAggregateResult {
   cancelados: number;
   pendientes: number;
   enPreparacion: number;
+  listos: number;
   menusVendidos: number;
+  porCobrar: number;
+  sinRegistro: number;
 }
 
 interface TopDishAggregateResult {
@@ -63,7 +66,7 @@ export class StatisticsService {
         estado: { $in: [OrderStatus.ENTREGADO, OrderStatus.CANCELADO] },
       })
       .select(
-        'menuId fecha cliente telefono total estado items validadoPorAdmin createdAt updatedAt aceptadoEn entregadoEn canceladoEn',
+        'menuId fecha cliente telefono total estado items validadoPorAdmin createdAt updatedAt aceptadoEn listoEn entregadoEn canceladoEn pagado medioPago pagadoEn',
       )
       .sort({ createdAt: -1, _id: -1 })
       .lean()
@@ -86,6 +89,34 @@ export class StatisticsService {
         $group: {
           _id: null,
           totalPedidos: { $sum: 1 },
+          porCobrar: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$estado', OrderStatus.ENTREGADO] },
+                    { $eq: ['$pagado', false] },
+                  ],
+                },
+                '$total',
+                0,
+              ],
+            },
+          },
+          sinRegistro: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$estado', OrderStatus.ENTREGADO] },
+                    { $eq: [{ $ifNull: ['$pagado', null] }, null] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
           ingresosTotales: {
             $sum: {
               $cond: [{ $eq: ['$estado', OrderStatus.ENTREGADO] }, '$total', 0],
@@ -105,6 +136,9 @@ export class StatisticsService {
             $sum: {
               $cond: [{ $eq: ['$estado', OrderStatus.EN_PREPARACION] }, 1, 0],
             },
+          },
+          listos: {
+            $sum: { $cond: [{ $eq: ['$estado', OrderStatus.LISTO] }, 1, 0] },
           },
           menusVendidos: {
             $sum: {
@@ -134,8 +168,33 @@ export class StatisticsService {
       cancelados: 0,
       pendientes: 0,
       enPreparacion: 0,
+      listos: 0,
       menusVendidos: 0,
+      porCobrar: 0,
+      sinRegistro: 0,
     };
+
+    const [paid] = await this.orderModel
+      .aggregate<{ total: number; efectivo: number; transferencia: number }>([
+        { $match: { pagado: true, pagadoEn: range.createdAt } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$total' },
+            efectivo: {
+              $sum: {
+                $cond: [{ $eq: ['$medioPago', 'efectivo'] }, '$total', 0],
+              },
+            },
+            transferencia: {
+              $sum: {
+                $cond: [{ $eq: ['$medioPago', 'transferencia'] }, '$total', 0],
+              },
+            },
+          },
+        },
+      ])
+      .exec();
 
     const tasaCompletacion =
       stats.totalPedidos > 0
@@ -150,10 +209,18 @@ export class StatisticsService {
       pedidosCancelados: stats.cancelados,
       pedidosPendientes: stats.pendientes,
       pedidosEnPreparacion: stats.enPreparacion,
+      pedidosListos: stats.listos,
       menusVendidos: stats.menusVendidos,
       tasaCompletacion: Math.round(tasaCompletacion * 100) / 100,
       ingresosTotales: Math.round(stats.ingresosTotales),
       ticketPromedio: Math.round(ticketPromedio),
+      pagos: {
+        total: paid?.total ?? 0,
+        efectivo: paid?.efectivo ?? 0,
+        transferencia: paid?.transferencia ?? 0,
+        porCobrar: stats.porCobrar ?? 0,
+        sinRegistro: stats.sinRegistro ?? 0,
+      },
       periodo: {
         startDate: range.startDate,
         endDate: range.endDate,

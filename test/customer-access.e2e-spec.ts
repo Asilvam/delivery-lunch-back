@@ -7,6 +7,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/auth/guards/roles.guard';
@@ -16,9 +17,10 @@ import { OrdersRepository } from '../src/orders/repositories/orders.repository';
 import { OrdersSseService } from '../src/orders/services/orders-sse.service';
 
 describe('Customer route protection', () => {
-  let app: INestApplication;
+  let app: INestApplication<Server>;
   let jwt: JwtService;
   const create = jest.fn().mockResolvedValue({ _id: 'test-order' });
+  const registerPayment = jest.fn().mockResolvedValue({ pagado: true });
   const input = {
     menuId: '000000000000000000000001',
     fecha: '2026-11-05',
@@ -54,7 +56,7 @@ describe('Customer route protection', () => {
           provide: ConfigService,
           useValue: new ConfigService({ JWT_SECRET: 'test-secret' }),
         },
-        { provide: OrdersService, useValue: { create } },
+        { provide: OrdersService, useValue: { create, registerPayment } },
         { provide: OrdersRepository, useValue: {} },
         { provide: OrdersSseService, useValue: {} },
       ],
@@ -72,6 +74,42 @@ describe('Customer route protection', () => {
   });
   afterAll(async () => {
     if (app) await app.close();
+  });
+  it('allows only admin to record a full payment and rejects amounts or unknown methods', async () => {
+    const path = '/orders/000000000000000000000001/payment';
+    await request(app.getHttpServer())
+      .patch(path)
+      .send({ medioPago: 'efectivo' })
+      .expect(401);
+    for (const role of ['customer', 'kitchen'])
+      await request(app.getHttpServer())
+        .patch(path)
+        .set(
+          'Authorization',
+          `Bearer ${jwt.sign({ sub: role, role, sid: '000000000000000000000003' })}`,
+        )
+        .send({ medioPago: 'efectivo' })
+        .expect(403);
+    const admin = `Bearer ${jwt.sign({ sub: 'admin', role: 'admin' })}`;
+    await request(app.getHttpServer())
+      .patch(path)
+      .set('Authorization', admin)
+      .send({ medioPago: 'tarjeta' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(path)
+      .set('Authorization', admin)
+      .send({ medioPago: 'efectivo', monto: 1000 })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(path)
+      .set('Authorization', admin)
+      .send({ medioPago: 'transferencia' })
+      .expect(200);
+    expect(registerPayment).toHaveBeenCalledWith(
+      '000000000000000000000001',
+      'transferencia',
+    );
   });
   it('rejects anonymous requests', () =>
     request(app.getHttpServer()).post('/orders').send(input).expect(401));
@@ -93,6 +131,40 @@ describe('Customer route protection', () => {
       )
       .send(input)
       .expect(401));
+  it('allows only administrators to create manual orders, with idempotency and the normal order validation', async () => {
+    const path = '/orders/manual';
+    const key = randomUUID();
+    await request(app.getHttpServer()).post(path).send(input).expect(401);
+    for (const role of ['customer', 'kitchen'])
+      await request(app.getHttpServer())
+        .post(path)
+        .set(
+          'Authorization',
+          `Bearer ${jwt.sign({ sub: role, role, sid: '000000000000000000000003' })}`,
+        )
+        .set('Idempotency-Key', key)
+        .send(input)
+        .expect(403);
+    const admin = `Bearer ${jwt.sign({ sub: 'admin', role: 'admin' })}`;
+    await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', admin)
+      .send(input)
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', admin)
+      .set('Idempotency-Key', key)
+      .send({ ...input, pagado: true })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', admin)
+      .set('Idempotency-Key', key)
+      .send(input)
+      .expect(201);
+    expect(create).toHaveBeenCalledWith(input, { admin: 'admin' }, key);
+  });
   it('requires a valid retry key', () =>
     request(app.getHttpServer())
       .post('/orders')

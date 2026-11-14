@@ -18,8 +18,10 @@ export class OrdersRepository {
   async create(
     createOrderDto: CreateOrderDto,
     metadata: {
-      customerGoogleId: string;
-      customerEmail: string;
+      customerGoogleId?: string;
+      customerEmail?: string;
+      origen: 'web' | 'manual';
+      creadoPorAdmin?: string;
       requestId: string;
       requestFingerprint: string;
     },
@@ -31,6 +33,7 @@ export class OrdersRepository {
     const order = new this.orderModel({
       ...createOrderDto,
       ...metadata,
+      pagado: false,
       menuId: new Types.ObjectId(createOrderDto.menuId),
       items: createOrderDto.items.map((item) => ({
         ...item,
@@ -45,13 +48,34 @@ export class OrdersRepository {
     await this.orderModel.init();
   }
 
+  async registerPayment(
+    id: string,
+    medioPago: string,
+  ): Promise<OrderDocument | null> {
+    return this.orderModel
+      .findOneAndUpdate(
+        {
+          _id: id,
+          pagado: { $ne: true },
+          estado: { $ne: OrderStatus.CANCELADO },
+        },
+        { $set: { pagado: true, medioPago, pagadoEn: new Date() } },
+        { new: true },
+      )
+      .exec();
+  }
+
   async findByRequest(
-    customerGoogleId: string,
+    customerGoogleId: string | null,
     requestId: string,
     session?: ClientSession,
   ): Promise<OrderDocument | null> {
     return this.orderModel
-      .findOne({ customerGoogleId, requestId })
+      .findOne(
+        customerGoogleId === null
+          ? { origen: 'manual', requestId }
+          : { customerGoogleId, requestId },
+      )
       .session(session ?? null)
       .exec();
   }
@@ -104,7 +128,13 @@ export class OrdersRepository {
     return this.orderModel
       .find({
         validadoPorAdmin: { $eq: true },
-        estado: { $in: [OrderStatus.PENDIENTE, OrderStatus.EN_PREPARACION] },
+        estado: {
+          $in: [
+            OrderStatus.PENDIENTE,
+            OrderStatus.EN_PREPARACION,
+            OrderStatus.LISTO,
+          ],
+        },
       })
       .sort({ createdAt: 1 })
       .exec();
@@ -145,7 +175,13 @@ export class OrdersRepository {
       .findOneAndUpdate(
         {
           _id: id,
-          estado: { $in: [OrderStatus.PENDIENTE, OrderStatus.EN_PREPARACION] },
+          estado: {
+            $in: [
+              OrderStatus.PENDIENTE,
+              OrderStatus.EN_PREPARACION,
+              OrderStatus.LISTO,
+            ],
+          },
         },
         { $set: { estado: OrderStatus.CANCELADO, canceladoEn: new Date() } },
         { new: true, session },
@@ -161,7 +197,9 @@ export class OrdersRepository {
     const timestamps =
       next === OrderStatus.EN_PREPARACION
         ? { aceptadoEn: new Date() }
-        : { entregadoEn: new Date() };
+        : next === OrderStatus.LISTO
+          ? { listoEn: new Date() }
+          : { entregadoEn: new Date() };
     return this.orderModel
       .findOneAndUpdate(
         { _id: id, estado: previous, validadoPorAdmin: true },

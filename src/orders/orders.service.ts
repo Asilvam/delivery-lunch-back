@@ -38,9 +38,12 @@ export class OrdersService {
 
   async create(
     dto: CreateOrderDto,
-    customer: { googleId: string; email: string; authVersion?: number },
+    actor:
+      | { googleId: string; email: string; authVersion?: number }
+      | { admin: string },
     requestId: string,
   ): Promise<OrderDocument> {
+    const customerId = 'googleId' in actor ? actor.googleId : null;
     const fingerprint = createHash('sha256')
       .update(
         JSON.stringify({
@@ -70,18 +73,19 @@ export class OrdersService {
     try {
       result = await this.connection.transaction(async (session) => {
         const existing = await this.ordersRepository.findByRequest(
-          customer.googleId,
+          customerId,
           requestId,
           session,
         );
         if (existing) return { order: checkExisting(existing), created: false };
-        await this.customers.recordOrder(
-          customer.googleId,
-          customer.authVersion ?? 0,
-          dto.cliente,
-          dto.telefono,
-          session,
-        );
+        if ('googleId' in actor)
+          await this.customers.recordOrder(
+            actor.googleId,
+            actor.authVersion ?? 0,
+            dto.cliente,
+            dto.telefono,
+            session,
+          );
         const menu = await this.menuRepository.findById(dto.menuId, session);
         this.eligibility.assertCanOrder(menu, dto.fecha);
         const quantities = new Map<string, number>();
@@ -147,8 +151,13 @@ export class OrdersService {
         const order = await this.ordersRepository.create(
           { ...dto, items, total },
           {
-            customerGoogleId: customer.googleId,
-            customerEmail: customer.email,
+            ...('googleId' in actor
+              ? {
+                  origen: 'web' as const,
+                  customerGoogleId: actor.googleId,
+                  customerEmail: actor.email,
+                }
+              : { origen: 'manual' as const, creadoPorAdmin: actor.admin }),
             requestId,
             requestFingerprint: fingerprint,
           },
@@ -164,7 +173,7 @@ export class OrdersService {
         error.code === 11000
       ) {
         const existing = await this.ordersRepository.findByRequest(
-          customer.googleId,
+          customerId,
           requestId,
         );
         if (existing) return checkExisting(existing);
@@ -214,7 +223,7 @@ export class OrdersService {
 
   /**
    * Cancela un pedido y restaura el stock de cada ítem.
-   * Solo se puede cancelar si el pedido está en estado pendiente o en_preparacion.
+   * Solo se puede cancelar antes de la entrega.
    */
   async cancelOrder(id: string): Promise<OrderDocument> {
     const result = await this.connection.transaction(async (session) => {
@@ -250,16 +259,17 @@ export class OrdersService {
     id: string,
     dto: UpdateOrderStatusDto,
   ): Promise<OrderDocument> {
-    if (
-      ![OrderStatus.EN_PREPARACION, OrderStatus.ENTREGADO].includes(dto.estado)
-    )
+    const previous = (
+      {
+        [OrderStatus.EN_PREPARACION]: OrderStatus.PENDIENTE,
+        [OrderStatus.LISTO]: OrderStatus.EN_PREPARACION,
+        [OrderStatus.ENTREGADO]: OrderStatus.LISTO,
+      } as Partial<Record<OrderStatus, OrderStatus>>
+    )[dto.estado];
+    if (!previous)
       throw new BadRequestException(
         'Usa la acción de cancelación para restaurar stock',
       );
-    const previous =
-      dto.estado === OrderStatus.EN_PREPARACION
-        ? OrderStatus.PENDIENTE
-        : OrderStatus.EN_PREPARACION;
     const order = await this.ordersRepository.advanceStatus(
       id,
       previous,
@@ -289,6 +299,23 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  async registerPayment(id: string, medioPago: string): Promise<OrderDocument> {
+    const updated = await this.ordersRepository.registerPayment(id, medioPago);
+    if (!updated) {
+      const existing = await this.findById(id);
+      if (existing.pagado && existing.medioPago === medioPago) return existing;
+      throw new ConflictException(
+        existing.pagado
+          ? 'Este pedido ya tiene un pago registrado. Actualiza la lista.'
+          : 'No se puede registrar un pago en un pedido cancelado.',
+      );
+    }
+    this.ordersSseService.emitToAdmin(updated, 'payment_update');
+    if (updated.validadoPorAdmin)
+      this.ordersSseService.emitToKitchen(updated, 'status_update');
+    return updated;
   }
 
   async findAllByAdminTrue(): Promise<OrderDocument[]> {

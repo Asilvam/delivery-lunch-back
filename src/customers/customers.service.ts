@@ -44,6 +44,7 @@ export class CustomersService {
               name: identity.name,
               email: identity.email,
               lastLoginAt: new Date(),
+              deleted: false,
             },
             $setOnInsert: { blocked: false, authVersion: 0 },
           },
@@ -76,7 +77,7 @@ export class CustomersService {
   }
   async active(googleId: string, version?: number) {
     const customer = await this.customers.findOne({ googleId }).exec();
-    if (!customer)
+    if (!customer || customer.deleted)
       throw new UnauthorizedException('Vuelve a iniciar sesión con Google.');
     this.assertAllowed(customer);
     if (version !== undefined && customer.authVersion !== version)
@@ -92,7 +93,12 @@ export class CustomersService {
   ) {
     const customer = await this.customers
       .findOneAndUpdate(
-        { googleId, blocked: false, authVersion: version },
+        {
+          googleId,
+          blocked: false,
+          deleted: { $ne: true },
+          authVersion: version,
+        },
         { $set: { contactName, phone }, $inc: { orderWrites: 1 } },
         { session, new: true },
       )
@@ -106,7 +112,7 @@ export class CustomersService {
   }
   async list(query: CustomerQueryDto) {
     const literal = query.q?.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { deleted: { $ne: true } };
     if (literal)
       filter.$or = ['name', 'email', 'phone'].map((field) => ({
         [field]: { $regex: literal, $options: 'i' },
@@ -122,6 +128,7 @@ export class CustomersService {
           profileEmail: '$email',
           profilePhone: '$phone',
           blocked: 1,
+          deleted: 1,
           blockReason: 1,
         },
       },
@@ -151,6 +158,7 @@ export class CustomersService {
           profileEmail: { $max: '$profileEmail' },
           profilePhone: { $max: '$profilePhone' },
           blocked: { $max: '$blocked' },
+          deleted: { $max: '$deleted' },
           blockReason: { $max: '$blockReason' },
           totalOrders: { $sum: '$orderCount' },
           approvedOrders: { $sum: '$approvedCount' },
@@ -175,6 +183,7 @@ export class CustomersService {
           email: { $ifNull: ['$profileEmail', '$latest.email', ''] },
           phone: { $ifNull: ['$profilePhone', '$latest.phone', ''] },
           blocked: { $ifNull: ['$blocked', false] },
+          deleted: 1,
           blockReason: { $ifNull: ['$blockReason', ''] },
           totalOrders: 1,
           approvedOrders: 1,
@@ -200,8 +209,8 @@ export class CustomersService {
       pageSize: 25,
     };
   }
-  async setBlocked(googleId: string, input: CustomerBlockDto, admin: string) {
-    let customer = await this.customers.findOne({ googleId }).exec();
+  private async ensureProfile(googleId: string) {
+    const customer = await this.customers.findOne({ googleId }).exec();
     if (!customer) {
       const order = await this.orders
         .findOne({ customerGoogleId: googleId })
@@ -226,7 +235,20 @@ export class CustomersService {
         )
         .exec();
     }
-    customer = await this.customers
+  }
+  async remove(googleId: string) {
+    await this.ensureProfile(googleId);
+    // Conserva los pedidos e invalida tanto el acceso actual como la sesión recordada.
+    await this.customers
+      .updateOne(
+        { googleId, deleted: { $ne: true } },
+        { $set: { deleted: true }, $inc: { authVersion: 1 } },
+      )
+      .exec();
+  }
+  async setBlocked(googleId: string, input: CustomerBlockDto, admin: string) {
+    await this.ensureProfile(googleId);
+    const customer = await this.customers
       .findOneAndUpdate(
         { googleId, blocked: { $ne: input.blocked } },
         {

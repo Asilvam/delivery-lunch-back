@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Query,
@@ -27,5 +29,10 @@ export class CustomersController {
     @Req() req: { user: { username: string } },
   ) {
     return this.customers.setBlocked(googleId, input, req.user.username);
+  }
+  @Delete(':googleId')
+  @HttpCode(204)
+  remove(@Param('googleId') googleId: string) {
+    return this.customers.remove(googleId);
   }
 }

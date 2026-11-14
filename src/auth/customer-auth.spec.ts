@@ -237,6 +237,62 @@ describe('Remembered customer sessions and administration (isolated database)', 
       .send({ blocked: 'true' })
       .expect(400);
   });
+  it('removes a customer from the list, invalidates sessions and keeps orders when they return through Google', async () => {
+    const first = await login();
+    const oldToken = (first.body as LoginBody).access_token;
+    await orders.create({
+      menuId: new Types.ObjectId(),
+      fecha: '2026-11-13',
+      cliente: 'Cliente',
+      telefono: '+56911111111',
+      total: 5500,
+      items: [],
+      customerGoogleId: 'google-user',
+      customerEmail: 'customer@example.test',
+    });
+    const previous = await orders.find().lean();
+    await http().delete('/customers/google-user').expect(401);
+    for (const token of [kitchen, oldToken])
+      await http()
+        .delete('/customers/google-user')
+        .set(auth(token))
+        .expect(403);
+    await http().delete('/customers/google-user').set(auth(admin)).expect(204);
+    await http().delete('/customers/google-user').set(auth(admin)).expect(204);
+    expect(
+      (await http().get('/customers').set(auth(admin)).expect(200)).body,
+    ).toMatchObject({ total: 0, items: [] });
+    await http().get('/session-test').set(auth(oldToken)).expect(401);
+    await post('refresh').set('Cookie', cookie(first)).send({}).expect(401);
+    await login();
+    expect(
+      (await http().get('/customers').set(auth(admin)).expect(200)).body,
+    ).toMatchObject({
+      total: 1,
+      items: [
+        expect.objectContaining({ googleId: 'google-user', totalOrders: 1 }),
+      ],
+    });
+    await http().get('/session-test').set(auth(oldToken)).expect(401);
+    expect(await orders.find().lean()).toEqual(previous);
+  });
+  it('also hides historical customers without a profile, without removing their orders', async () => {
+    await orders.create({
+      menuId: new Types.ObjectId(),
+      fecha: '2026-11-13',
+      cliente: 'Anterior',
+      telefono: '+56911111111',
+      total: 5500,
+      items: [],
+      customerGoogleId: 'historical',
+    });
+    await http().delete('/customers/historical').set(auth(admin)).expect(204);
+    expect(
+      (await http().get('/customers').set(auth(admin)).expect(200)).body,
+    ).toMatchObject({ total: 0 });
+    expect(await orders.countDocuments()).toBe(1);
+    await http().delete('/customers/missing').set(auth(admin)).expect(404);
+  });
   it('lists historical verified customers without duplicates and leaves old orders untouched when blocked', async () => {
     await login();
     const record = {
